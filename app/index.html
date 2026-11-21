@@ -97,10 +97,14 @@ const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
     <h2>How you show up in the room</h2>
     <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
-    <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."></label></div>
+    <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."><span class="small" id="hdmsg">Lowercase letters, numbers, _ or . (3–20)</span></label></div>
     <div class="chips" id="icons">${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
     <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>`; }
 function wireId(st){
+  const hd=document.getElementById('hd'), hm=document.getElementById('hdmsg'); let tmr;
+  hd.oninput=()=>{ const c=hd.value.toLowerCase().replace(/[^a-z0-9_.]/g,''); if(c!==hd.value){ hd.value=c; hm.textContent='Only lowercase letters, numbers, _ or . allowed'; hm.style.color='var(--gold)'; }
+    clearTimeout(tmr); tmr=setTimeout(async()=>{ if(!HANDLE_RE.test(hd.value)){ hm.textContent='3–20 characters'; hm.style.color='var(--muted)'; return; }
+      const { data } = await SB.rpc('handle_available',{ h:hd.value }); hm.textContent = data===false?'Taken. Try another.':'@'+hd.value+' is yours if you save'; hm.style.color = data===false?'var(--red)':'var(--green)'; },400); };
   document.querySelectorAll('#icons .chip').forEach(b=>b.onclick=()=>{ st.icon=b.textContent; document.querySelectorAll('#icons .chip').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
   document.querySelectorAll('#colors .chip').forEach(b=>b.onclick=()=>{ st.color=b.dataset.c; document.querySelectorAll('#colors .chip').forEach(x=>{ const on=x===b; x.setAttribute('aria-pressed',on); x.style.borderColor=on?'var(--ink)':x.dataset.c; x.style.borderWidth=on?'3px':'1px'; }); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
 }
@@ -427,7 +431,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
   document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
   document.getElementById('sv').onclick=async()=>{
-    const hc=await checkHandle(); if(hc.err) return toast(hc.err);
+    const hc=await checkHandle(); if(hc.err){ const hm=document.getElementById('hdmsg'); hm.textContent=hc.err; hm.style.color='var(--red)'; document.getElementById('hd').scrollIntoView({block:'center'}); document.getElementById('hd').focus(); return; }
     const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
     const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color };
     const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
