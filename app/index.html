@@ -143,6 +143,7 @@ async function loadProfile(){
   S.profile = data; render();
 }
 function render(){
+  if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
   document.getElementById('tabs').hidden = !(S.user && S.profile);
   if(!S.user) return renderWelcome();
   if(!S.profile) return renderOnboard();
@@ -383,13 +384,19 @@ async function openChat(cid){
   const { data:msgs } = await SB.from('messages').select('*').eq('connection_id',cid).order('created_at');
   $app.innerHTML = `<div class="screen">
     <div class="row between"><button class="back" id="bk">‹ Chats</button><button class="btn sm gold" id="kp">Keep</button></div>
-    <div id="msgs" style="display:flex;flex-direction:column;gap:8px">${(msgs||[]).map(m=>`<div class="bubble ${m.sender===S.user.id?'me':''}">${esc(m.body)}</div>`).join('')||'<p class="small muted">Say something nice. Then go say it in person.</p>'}</div>
+    <div id="msgs" style="display:flex;flex-direction:column;gap:8px">${(msgs||[]).map(m=>`<div class="bubble ${m.sender===S.user.id?'me':''}" data-id="${m.id}">${esc(m.body)}</div>`).join('')||'<p class="small muted" id="nomsg">Say something nice. Then go say it in person.</p>'}</div>
     <div class="row"><input type="text" id="tx" maxlength="1000" placeholder="Message"><button class="btn sm violet" id="sd">Send</button></div>
     <button class="btn" id="bl" style="color:var(--red)">Block or report</button>
   </div>`;
   document.getElementById('bk').onclick=()=>setTab('chats');
   document.getElementById('kp').onclick=async()=>{ await SB.rpc('keep_connection',{ cid }); toast('Kept. It stays if they keep it too.'); };
-  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; const { error } = await SB.from('messages').insert({ connection_id:cid, sender:S.user.id, body }); if(error) return toast(error.message); tx.value=''; openChat(cid); };
+  const box=document.getElementById('msgs');
+  const addMsg=m=>{ if(!document.body.contains(box) || box.querySelector(`[data-id="${m.id}"]`)) return; document.getElementById('nomsg')?.remove();
+    const d=document.createElement('div'); d.className='bubble'+(m.sender===S.user.id?' me':''); d.dataset.id=m.id; d.textContent=m.body; box.appendChild(d); d.scrollIntoView({block:'end',behavior:'smooth'}); };
+  box.lastElementChild?.scrollIntoView({block:'end'});
+  if(S.chan) SB.removeChannel(S.chan);
+  S.chan = SB.channel('chat-'+cid).on('postgres_changes',{ event:'INSERT', schema:'public', table:'messages', filter:'connection_id=eq.'+cid }, p=>addMsg(p.new)).subscribe();
+  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; tx.value=''; const { data, error } = await SB.from('messages').insert({ connection_id:cid, sender:S.user.id, body }).select().single(); if(error){ tx.value=body; return toast(error.message); } addMsg(data); tx.focus(); };
   document.getElementById('sd').onclick=send; document.getElementById('tx').onkeydown=e=>{ if(e.key==='Enter') send(); };
   document.getElementById('bl').onclick=async()=>{
     const { data:c } = await SB.from('connections').select('user_a,user_b').eq('id',cid).single(); const other = c.user_a===S.user.id?c.user_b:c.user_a;
