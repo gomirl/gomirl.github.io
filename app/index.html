@@ -281,15 +281,12 @@ async function renderMap(){
       let osm=S.osmCache[key];
       if(!osm){
         const q=`[out:json][timeout:12];(nwr["amenity"~"^(bar|pub|nightclub|restaurant|cafe|biergarten)$"]["name"](${box.s},${box.w},${box.n},${box.e}););out center 300;`;
-        for(const host of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter']){
-          try{ const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),8000);
-            const r=await fetch(host,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal}); clearTimeout(t);
-            if(!r.ok) continue; const j=await r.json();
-            osm=(j.elements||[]).map(x=>({ osm_id:x.type[0]+x.id, name:x.tags.name, category:x.tags.amenity, address:[x.tags['addr:housenumber'],x.tags['addr:street']].filter(Boolean).join(' ')||null, lat:x.lat??x.center?.lat, lng:x.lon??x.center?.lon })).filter(x=>x.lat&&x.lng);
-            S.osmCache[key]=osm; break;
-          }catch{}
-          if(my!==seq) return;
-        }
+        const ask=host=>{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(),15000);
+          return fetch(host,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal})
+            .then(r=>r.ok?r.json():Promise.reject(r.status)).then(j=>j.elements?j:Promise.reject('bad')); };
+        try{ const j=await Promise.any(['https://overpass.private.coffee/api/interpreter','https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'].map(ask));
+          osm=(j.elements||[]).map(x=>({ osm_id:x.type[0]+x.id, name:x.tags.name, category:x.tags.amenity, address:[x.tags['addr:housenumber'],x.tags['addr:street']].filter(Boolean).join(' ')||null, lat:x.lat??x.center?.lat, lng:x.lon??x.center?.lon })).filter(x=>x.lat&&x.lng);
+          S.osmCache[key]=osm; }catch{}
       }
       if(my!==seq || !osm) return;
       const have=new Set(list.map(v=>v.osm_id).filter(Boolean));
