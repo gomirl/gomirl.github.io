@@ -90,6 +90,24 @@ function pickField(id,label,opts,val){ const other = val && !opts.includes(val);
   <label class="f" id="${id}w" ${other?'':'hidden'}>In your words<input type="text" id="${id}" maxlength="40" value="${other?esc(val):''}"></label>`; }
 function pickVal(id){ const s=document.getElementById(id+'s').value; return s==='__o' ? (document.getElementById(id).value.trim()||null) : (s||null); }
 const ORIENTS=['Straight','Gay','Lesbian','Bisexual','Pansexual','Queer','Heteroflexible','Homoflexible','Asexual','Demisexual','Questioning'];
+const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🍉','🎲'];
+const COLORS=['#7B78FF','#DCD03A','#45BE85','#FF8A7A','#5EC8F2','#E58CFF'];
+function av(icon,color,size){ size=size||48; return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${esc(icon||'✨')}</div>`; }
+const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
+function idBlock(h,icon,color){ return `
+    <h2>How you show up in the room</h2>
+    <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
+    <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."></label></div>
+    <div class="chips" id="icons">${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
+    <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>`; }
+function wireId(st){
+  document.querySelectorAll('#icons .chip').forEach(b=>b.onclick=()=>{ st.icon=b.textContent; document.querySelectorAll('#icons .chip').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
+  document.querySelectorAll('#colors .chip').forEach(b=>b.onclick=()=>{ st.color=b.dataset.c; document.querySelectorAll('#colors .chip').forEach(x=>{ const on=x===b; x.setAttribute('aria-pressed',on); x.style.borderColor=on?'var(--ink)':x.dataset.c; x.style.borderWidth=on?'3px':'1px'; }); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
+}
+async function checkHandle(){ const h=document.getElementById('hd').value.trim().toLowerCase().replace(/^@/,'');
+  if(!HANDLE_RE.test(h)) return { err:'Handle: 3–20 letters, numbers, _ or .' };
+  const { data } = await SB.rpc('handle_available',{ h }); if(data===false) return { err:'That handle is taken. Try another.' };
+  return { h }; }
 const CHECKIN_RADIUS_M = 120;
 const S = { user:null, profile:null, tab:'map', venues:[], map:null };
 const $app = document.getElementById('app');
@@ -117,6 +135,7 @@ function render(){
   document.getElementById('tabs').hidden = !(S.user && S.profile);
   if(!S.user) return renderWelcome();
   if(!S.profile) return renderOnboard();
+  if(!S.profile.handle){ S.tab='me'; return renderMe(true); }
   ({map:renderMap, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
 }
 
@@ -141,12 +160,13 @@ function renderWelcome(){
 function renderOnboard(){
   const meta = S.user.user_metadata||{};
   const first = (meta.full_name||meta.name||'').split(' ')[0];
-  const st = { mode:'both', picked:{} };
+  const st = { mode:'both', picked:{}, icon:ICONS[Math.floor(Math.random()*ICONS.length)], color:COLORS[0] };
   $app.innerHTML = `<div class="screen">
     <h1>Welcome to MIRL</h1>
     <p class="muted">A few basics. Only your first name and age are ever shown, and only inside the same spot.</p>
     <label class="f">First name<input type="text" id="fn" maxlength="40" value="${esc(first)}" autocomplete="given-name"></label>
     <label class="f">Birthday (must be 18+)<input type="date" id="bd" max="${new Date(Date.now()-18*365.25*864e5).toISOString().slice(0,10)}"></label>
+    ${idBlock('',st.icon,st.color)}
     <h2>I'm looking for</h2>
     <div class="seg" id="mode"><button data-v="dating" aria-pressed="false">Dating</button><button data-v="both" aria-pressed="true">Open to both</button><button data-v="friends" aria-pressed="false">Friends</button></div>
     <label class="f">I am<select id="gender"><option value="">Choose…</option><option value="woman">Woman</option><option value="man">Man</option><option value="trans woman">Trans woman</option><option value="trans man">Trans man</option><option value="nonbinary">Nonbinary</option><option value="genderfluid">Genderfluid / genderqueer</option><option value="self">Let me type it</option><option value="private">Prefer not to say</option></select></label>
@@ -159,6 +179,7 @@ function renderOnboard(){
     <button class="btn gold" id="save">Save and see the map</button>
   </div>`;
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ st.mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed', x===b)); });
+  wireId(st);
   document.getElementById('gender').onchange=e=>{ document.getElementById('gselfwrap').hidden = e.target.value!=='self'; };
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); st.picked[b.textContent]=on; });
   document.getElementById('save').onclick = async ()=>{
@@ -167,6 +188,7 @@ function renderOnboard(){
     if(!fn) return err.textContent='Add your first name.';
     if(!bd) return err.textContent='Add your birthday.';
     if((Date.now()-new Date(bd))/(365.25*864e5) < 18) return err.textContent='MIRL is 18+ only.';
+    const hc=await checkHandle(); if(hc.err) return err.textContent=hc.err;
     if(!document.getElementById('terms').checked) return err.textContent='Please check the box to continue.';
     const show=document.getElementById('show').value;
     const GROUPS={ w:['woman','trans woman'], m:['man','trans man'], nb:['nonbinary','genderfluid'] };
@@ -174,7 +196,7 @@ function renderOnboard(){
     let g=document.getElementById('gender').value;
     if(g==='self') g=document.getElementById('gself').value.trim().toLowerCase()||null;
     if(g==='private') g=null;
-    const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:g||null,
+    const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:g||null, handle:hc.h, avatar_icon:st.icon, avatar_color:st.color,
       show_genders: showG, interests:Object.keys(st.picked).filter(k=>st.picked[k]), avatar_url: meta.avatar_url||meta.picture||null };
     const { error } = await SB.from('profiles').insert(row);
     if(error) return err.textContent = error.message.includes('birth_date') ? 'MIRL is 18+ only.' : 'Could not save: '+error.message;
@@ -189,7 +211,7 @@ async function renderMap(){
       <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Visible inside'}</span></div>
     <div id="feat"></div>
     <div id="map" role="region" aria-label="Map of Atlantic Ave venues"></div>
-    <p class="small muted">Numbers only. You see who's inside once you're there too. Spots under 5 show no count.</p>
+    <p class="small muted">Numbers only. You see who's inside once you're there too, and only as avatars and handles.</p>
     <h2>Spots</h2><div class="list" id="vlist"></div>
   </div>`;
   const [{ data:venues }, { data:feat }] = await Promise.all([SB.rpc('venue_counts'), SB.rpc('featured_plan')]);
@@ -210,7 +232,7 @@ async function renderMap(){
   });
   document.getElementById('vlist').innerHTML = S.venues.map(v=>`<button class="item" data-id="${v.venue_id}">
      <div style="flex:1"><p style="font-weight:600">${esc(v.name)}</p></div>
-     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Under 5'}</span></button>`).join('');
+     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}</span></button>`).join('');
   document.querySelectorAll('#vlist .item').forEach(b=>b.onclick=()=>openVenue(b.dataset.id));
 }
 
@@ -224,7 +246,7 @@ async function openVenue(id){
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Back to map</button>
     <h1>${esc(v.name)}</h1>
-    <div class="card"><p style="font-family:var(--display);font-size:30px;font-weight:700;color:var(--gold)">${v.members_here||'Under 5'}</p><p class="small muted">members inside now</p></div>
+    <div class="card"><p style="font-family:var(--display);font-size:30px;font-weight:700;color:var(--gold)">${v.members_here||0}</p><p class="small muted">members inside now</p></div>
     <button class="btn gold" id="ci">I'm here · check in</button>
     <p class="small muted">Uses your location once, only to confirm you're at ${esc(v.name)}. You're checked out when you leave or after 3 hours.</p>
     <div class="err" id="err"></div>
@@ -257,8 +279,8 @@ async function openInside(vid, name){
     <p class="small muted">Checked in</p><h1>${esc(name)}</h1>
     <div class="row between"><h2>Here now · best matches first</h2><span class="small muted">Visible only inside</span></div>
     <div class="list" id="ppl">${error?'<p class="err">'+esc(error.message)+'</p>':(people||[]).length? people.map(p=>`<div class="item" style="cursor:default">
-      <div class="avatar">${p.photo_url||p.avatar_url?`<img src="${esc(p.photo_url||p.avatar_url)}" alt="">`:initials(p.first_name)}</div>
-      <div style="flex:1;min-width:0"><p style="font-weight:600">${esc(p.first_name)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
+      ${av(p.avatar_icon,p.avatar_color)}
+      <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(p.handle)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
       <p class="small muted">${p.shared_interests?p.shared_interests+' shared interest'+(p.shared_interests>1?'s':''):''}</p></div>
       <button class="btn gold sm" data-id="${p.id}">Say hi</button></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
     <p class="small muted">"Open to casual" only shows when you both turned it on.</p>
@@ -342,7 +364,7 @@ async function renderChats(){
   const { data:cons } = await SB.rpc('my_chats');
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
-      return `<button class="item" data-id="${c.id}"><div class="avatar">${initials(c.other_name)}</div><div style="flex:1"><p style="font-weight:600">${esc(c.other_name)}</p>
+      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
       <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Kept by both of you':mineKept?'You kept it · waiting on them':'Disappears in '+hrs+'h'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Keep to save it.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
 }
@@ -369,12 +391,15 @@ async function openChat(cid){
 }
 
 // ---------- me / living room ----------
-function renderMe(){
+function renderMe(needHandle){
   const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
+  const ist={ icon:p.avatar_icon||'✨', color:p.avatar_color||COLORS[0] };
   let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
   $app.innerHTML = `<div class="screen">
     <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
-    <div class="card row"><div class="avatar" style="width:64px;height:64px">${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="">`:initials(p.first_name)}</div><div><p style="font-size:18px;font-weight:600">${esc(p.first_name)}</p><p class="small muted">Photo from your sign-in</p></div></div>
+    ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">New: pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
+    ${idBlock(p.handle||'',ist.icon,ist.color)}
+    <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b></p>
     <h2>I'm looking for</h2>
     <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
     <h2>Tap what you're into</h2>
@@ -397,12 +422,14 @@ function renderMe(){
   </div>`;
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
+  wireId(ist);
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
   document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
   document.getElementById('sv').onclick=async()=>{
+    const hc=await checkHandle(); if(hc.err) return toast(hc.err);
     const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
-    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, desires:Object.keys(dpick).filter(k=>dpick[k]) };
+    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color };
     const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
     if(error) return toast(error.message); toast('Saved'); loadProfile();
   };
