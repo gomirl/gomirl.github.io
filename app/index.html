@@ -210,7 +210,7 @@ function renderOnboard(){
     const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:g||null, handle:hc.h, avatar_icon:st.icon, avatar_color:st.color,
       show_genders: showG, interests:Object.keys(st.picked).filter(k=>st.picked[k]), avatar_url: meta.avatar_url||meta.picture||null };
     const { error } = await SB.from('profiles').insert(row);
-    if(error) return err.textContent = error.message.includes('birth_date') ? 'MIRL is 18+ only.' : 'Could not save: '+error.message;
+    if(error) return err.textContent = error.message.includes('account_not_allowed') ? "This account can't use MIRL. Questions: hello@gomirl.com" : error.message.includes('birth_date') ? 'MIRL is 18+ only.' : 'Could not save: '+error.message;
     toast('Welcome to MIRL'); loadProfile();
   };
 }
