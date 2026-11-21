@@ -475,7 +475,7 @@ async function renderPlans(){
   $app.innerHTML = `<div class="screen">
     <div class="row between"><h1>My plans</h1><button class="btn gold sm" id="np">+ New plan</button></div>
     <div class="list">${list.length? list.map(m=>{const p=m.plans,w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${esc(p.venues?.name)} · ${m.friends?'you + '+m.friends:'just you'}</p></div></button>`}).join('') : '<p class="muted">No plans yet. Pick a spot on the map, or start one.</p>'}</div>
-    <div class="card"><p style="font-weight:600;color:var(--violet)">Founding Member</p><p class="small muted">You joined before launch.</p></div>
+    ${S.profile.founding_member?'<div class="card"><p style="font-weight:600;color:var(--violet)">★ Founding Member</p><p class="small muted">You joined before launch. This badge is yours for good.</p></div>':''}
   </div>`;
   document.getElementById('np').onclick=()=>newPlan(null);
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
@@ -533,7 +533,7 @@ function renderMe(needHandle){
     <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
     ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">New: pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
     ${idBlock(p.handle||'',ist.icon,ist.color)}
-    <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b></p>
+    <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b>${p.founding_member?' · <b style="color:var(--violet)">★ Founding Member</b>':''}</p>
     <h2>I'm looking for</h2>
     <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
     <h2>Tap what you're into</h2>
