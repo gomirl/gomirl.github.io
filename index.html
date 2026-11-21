@@ -141,7 +141,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   </div>
 </section>
 
-<footer><div class="wrap"><span>© 2026 MIRL · Meet In Real Life</span><span>hello@gomirl.com</span></div></footer>
+<footer><div class="wrap"><span>© 2026 MIRL · Meet In Real Life</span><span><a href="https://www.instagram.com/mirl.app/" target="_blank" rel="noopener" style="color:inherit">Instagram</a> · <a href="https://www.facebook.com/profile.php?id=61596968152556" target="_blank" rel="noopener" style="color:inherit">Facebook</a> · <a href="/privacy/" style="color:inherit">Privacy</a> · hello@gomirl.com</span></div></footer>
 <script>
 (function(){
   var URL='https://docs.google.com/forms/d/e/1FAIpQLSdQFMSMrDOwEpB-vhj_QkX1gy5qg0rXZLQhYFl3VkJ2NCN_zQ/formResponse';
@@ -165,7 +165,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     var btn=document.getElementById('go'); btn.disabled=true; btn.textContent='Saving...';
     fetch(URL,{method:'POST',mode:'no-cors',body:d}).then(function(){
       var safe=fn.replace(/[<>&"]/g,'');
-      f.innerHTML='<div class="done"><span class="badge" style="justify-content:center"><i></i>Founding Member</span><strong>You\'re on the list, '+safe+'.</strong><p>We\'ll email you before the first MIRL Night on Atlantic Ave.</p></div>';
+      f.innerHTML='<div class="done"><span class="badge" style="justify-content:center"><i></i>Founding Member</span><strong>You\'re on the list, '+safe+'.</strong><p>We\'ll email you before the first MIRL Night on Atlantic Ave.</p><p style="margin-top:6px">Want the first look? Follow along: <a href="https://www.instagram.com/mirl.app/" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Instagram @mirl.app</a> · <a href="https://www.facebook.com/profile.php?id=61596968152556" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Facebook</a></p></div>';
     }).catch(function(){btn.disabled=false;btn.textContent='Save my spot';err.textContent='That did not go through. Check your connection and try again.';});
   });
 })();
