@@ -45,6 +45,7 @@ input[type=text],input[type=date],input[type=datetime-local],input[type=number],
 .avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font:700 18px var(--display);color:var(--bg);background:var(--violet);overflow:hidden}
 .avatar img{width:100%;height:100%;object-fit:cover}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:#171424;border-top:1px solid var(--line);padding:8px 8px max(14px,env(safe-area-inset-bottom));z-index:1000}
+[hidden]{display:none!important}
 nav.tabs .in{max-width:480px;width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 nav.tabs button{background:none;border:none;color:var(--muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;cursor:pointer}
 nav.tabs button[aria-current=page]{color:var(--gold);font-weight:600}
@@ -81,7 +82,9 @@ nav.tabs svg{width:22px;height:22px}
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const SB = supabase.createClient('https://mvgqkliypebyiwqssxbu.supabase.co','sb_publishable_0818FosZ3hllftazzKvlyQ_s9t-qruJ');
-const INTERESTS=['Live music','Craft beer','Wine bars','Beach days','Boating','Yoga','Dogs','Trivia nights','Salsa','Comedy','Foodie','Golf','Art walks','Karaoke','Sports bars','Concerts'];
+const INTERESTS=['Live music','Concerts','DJ nights','Dancing','Salsa','Karaoke','Comedy','Trivia nights','Craft beer','Wine bars','Cocktails','Sober-curious','Foodie','Brunch','Beach days','Boating','Fishing','Yoga','Fitness','Pickleball','Golf','Running','Dogs','Art walks','Theater','Gaming','Sports bars','Travel','Drag shows','Pride events','LGBTQ+ friendly'];
+const DESIRES=['Casual hookups','Friends with benefits','Ethical non-monogamy','Open relationship','Polyamory','Swinging / lifestyle','Couples','Unicorn-friendly','Threesomes','Group play','Bi-curious','Queer-curious','Kink-curious','Kinky','BDSM','Dom / sub','Roleplay','Voyeur','Exhibitionist','Tantra','Sensual / slow','Sex-positive','Discreet','Just flirting'];
+const ORIENTS=['Straight','Gay','Lesbian','Bisexual','Pansexual','Queer','Heteroflexible','Homoflexible','Asexual','Demisexual','Questioning'];
 const CHECKIN_RADIUS_M = 120;
 const S = { user:null, profile:null, tab:'map', venues:[], map:null };
 const $app = document.getElementById('app');
@@ -141,8 +144,9 @@ function renderOnboard(){
     <label class="f">Birthday (must be 18+)<input type="date" id="bd" max="${new Date(Date.now()-18*365.25*864e5).toISOString().slice(0,10)}"></label>
     <h2>I'm looking for</h2>
     <div class="seg" id="mode"><button data-v="dating" aria-pressed="false">Dating</button><button data-v="both" aria-pressed="true">Open to both</button><button data-v="friends" aria-pressed="false">Friends</button></div>
-    <label class="f">I am<select id="gender"><option value="">Choose…</option><option>woman</option><option>man</option><option>nonbinary</option></select></label>
-    <label class="f">Show me<select id="show"><option value="">Everyone</option><option value="man">Men</option><option value="woman">Women</option></select></label>
+    <label class="f">I am<select id="gender"><option value="">Choose…</option><option value="woman">Woman</option><option value="man">Man</option><option value="trans woman">Trans woman</option><option value="trans man">Trans man</option><option value="nonbinary">Nonbinary</option><option value="genderfluid">Genderfluid / genderqueer</option><option value="self">Let me type it</option><option value="private">Prefer not to say</option></select></label>
+    <label class="f" id="gselfwrap" hidden>In your words<input type="text" id="gself" maxlength="30" placeholder="How you describe yourself"></label>
+    <label class="f">Show me<select id="show"><option value="">Everyone</option><option value="w">Women</option><option value="m">Men</option><option value="nb">Nonbinary people</option><option value="w,nb">Women + nonbinary</option><option value="m,nb">Men + nonbinary</option></select></label>
     <h2>Tap what you're into</h2>
     <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="false">${esc(i)}</button>`).join('')}</div>
     <label class="row small muted" style="gap:10px"><input type="checkbox" id="terms" style="width:20px;height:20px">I'm 18 or older and agree to be respectful. Block and report are always one tap away.</label>
@@ -150,6 +154,7 @@ function renderOnboard(){
     <button class="btn gold" id="save">Save and see the map</button>
   </div>`;
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ st.mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed', x===b)); });
+  document.getElementById('gender').onchange=e=>{ document.getElementById('gselfwrap').hidden = e.target.value!=='self'; };
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); st.picked[b.textContent]=on; });
   document.getElementById('save').onclick = async ()=>{
     const err=document.getElementById('err');
@@ -159,8 +164,13 @@ function renderOnboard(){
     if((Date.now()-new Date(bd))/(365.25*864e5) < 18) return err.textContent='MIRL is 18+ only.';
     if(!document.getElementById('terms').checked) return err.textContent='Please check the box to continue.';
     const show=document.getElementById('show').value;
-    const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:document.getElementById('gender').value||null,
-      show_genders: show?[show]:[], interests:Object.keys(st.picked).filter(k=>st.picked[k]), avatar_url: meta.avatar_url||meta.picture||null };
+    const GROUPS={ w:['woman','trans woman'], m:['man','trans man'], nb:['nonbinary','genderfluid'] };
+    const showG = show ? show.split(',').flatMap(k=>GROUPS[k]) : [];
+    let g=document.getElementById('gender').value;
+    if(g==='self') g=document.getElementById('gself').value.trim().toLowerCase()||null;
+    if(g==='private') g=null;
+    const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:g||null,
+      show_genders: showG, interests:Object.keys(st.picked).filter(k=>st.picked[k]), avatar_url: meta.avatar_url||meta.picture||null };
     const { error } = await SB.from('profiles').insert(row);
     if(error) return err.textContent = error.message.includes('birth_date') ? 'MIRL is 18+ only.' : 'Could not save: '+error.message;
     toast('Welcome to MIRL'); loadProfile();
@@ -328,7 +338,7 @@ async function renderChats(){
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
       return `<button class="item" data-id="${c.id}"><div class="avatar">${initials(c.other_name)}</div><div style="flex:1"><p style="font-weight:600">${esc(c.other_name)}</p>
-      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Kept by both of you':mineKept?'You kept it · waiting on them':'Disappears in '+hrs+'h'}</p></div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Keep to save it.</p>'}</div></div>`;
+      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Kept by both of you':mineKept?'You kept it · waiting on them':'Disappears in '+hrs+'h'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Keep to save it.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
 }
 async function openChat(cid){
@@ -356,7 +366,7 @@ async function openChat(cid){
 // ---------- me / living room ----------
 function renderMe(){
   const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
-  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual;
+  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
   $app.innerHTML = `<div class="screen">
     <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
     <div class="card row"><div class="avatar" style="width:64px;height:64px">${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="">`:initials(p.first_name)}</div><div><p style="font-size:18px;font-weight:600">${esc(p.first_name)}</p><p class="small muted">Photo from your sign-in</p></div></div>
@@ -365,10 +375,15 @@ function renderMe(){
     <h2>Tap what you're into</h2>
     <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="${!!picked[i]}">${esc(i)}</button>`).join('')}</div>
     <h2>Who I am & what I'm open to</h2>
-    <label class="f">Orientation (optional)<input type="text" id="or" maxlength="40" value="${esc(p.orientation||'')}" placeholder="Self-describe"></label>
-    <label class="f">Relationship style (optional)<input type="text" id="rs" maxlength="40" value="${esc(p.relationship_style||'')}" placeholder="Monogamous, open, …"></label>
+    <label class="f">Orientation (optional)<input type="text" id="or" maxlength="40" value="${esc(p.orientation||'')}" placeholder="Pick or type your own" list="orl"><datalist id="orl">${ORIENTS.map(o=>`<option value="${o}">`).join('')}</datalist></label>
+    <label class="f">Relationship style (optional)<input type="text" id="rs" maxlength="40" value="${esc(p.relationship_style||'')}" placeholder="Pick or type your own" list="rsl"><datalist id="rsl">${['Monogamous','Ethically non-monogamous','Open relationship','Polyamorous','Partnered, exploring together','Single and exploring'].map(o=>`<option value="${o}">`).join('')}</datalist></label>
     <div class="row" style="gap:8px"><label class="f" style="flex:1">Ages from<input type="number" id="amin" min="18" max="99" value="${p.show_age_min}"></label><label class="f" style="flex:1">to<input type="number" id="amax" min="18" max="99" value="${p.show_age_max}"></label></div>
     <div class="card row between"><div><p style="font-weight:600">Open to something casual</p><p class="small muted">Only members who also turned this on will see it</p></div><button class="switch" id="cs" role="switch" aria-checked="${casual}" aria-label="Open to something casual"></button></div>
+    <div id="dz" ${casual?'':'hidden'}>
+      <h2>My private side</h2>
+      <p class="small muted" style="margin-bottom:10px">Never shown in the room or on the map. Only when you both say hi and you're both open to casual, your chat shows what you have in common. Nothing else.</p>
+      <div class="chips" id="dchips">${DESIRES.map(i=>`<button class="chip" aria-pressed="${!!dpick[i]}">${esc(i)}</button>`).join('')}</div>
+    </div>
     <h2>Privacy</h2>
     <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">You're hidden until you check in, either way. Off lets members inside your spot find you right away.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
     <button class="btn gold" id="sv">Save</button>
@@ -377,11 +392,12 @@ function renderMe(){
   </div>`;
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
-  document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); };
+  document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
+  document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
   document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
   document.getElementById('sv').onclick=async()=>{
     const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
-    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:document.getElementById('or').value.trim()||null, relationship_style:document.getElementById('rs').value.trim()||null, show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost };
+    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:document.getElementById('or').value.trim()||null, relationship_style:document.getElementById('rs').value.trim()||null, show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, desires:Object.keys(dpick).filter(k=>dpick[k]) };
     const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
     if(error) return toast(error.message); toast('Saved'); loadProfile();
   };
