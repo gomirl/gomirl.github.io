@@ -340,18 +340,32 @@ async function openPlan(pid){
   const { data:p } = await SB.from('plans').select('id,title,starts_at,visibility,host_id,invite_code,venue_id,venues(name)').eq('id',pid).single();
   if(!p) return toast('Plan not found');
   const { data:mine } = await SB.from('plan_members').select('friends').eq('plan_id',pid).eq('user_id',S.user.id).maybeSingle();
+  const [{ data:cnt }, { data:going }] = await Promise.all([SB.rpc('plan_count',{ pid }), mine ? SB.rpc('plan_going',{ pid }) : Promise.resolve({ data:[] })]);
   let friends = mine?.friends||0; const w=when(p.starts_at);
   const label=()=>friends===0?'Just me':'Me + '+friends+(friends===1?' friend':' friends');
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Back</button>
-    <div class="row"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div><h1>${esc(p.title)}</h1><p class="muted">${esc(p.venues?.name)} · ${p.visibility==='open'?'Open':'Invite-only'}</p></div></div>
+    <div class="row"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div><h1>${esc(p.title)}</h1><p class="muted">${esc(p.venues?.name)} · ${p.visibility==='open'?'Open':'Invite-only'} · ${cnt||0} going</p></div></div>
     <h2>Going as</h2>
     <div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm violet" id="pl" aria-label="One more friend">+</button></div></div>
     <p class="small muted">Bring up to 4 friends.</p>
     <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
     ${mine?'<button class="btn" id="lv">Not going anymore</button>':''}
     ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
+    <h2>Who's going</h2>
+    ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
+      : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color)}
+        <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
+        <p class="small muted">${g.shared_interests?g.shared_interests+' shared interest'+(g.shared_interests>1?'s':''):''}</p></div>
+        <button class="btn gold sm" data-id="${g.id}">Say hi</button></div>`).join('')}</div>
+        <p class="small muted">If you both say hi, a chat opens before you get there.</p>`
+      : '<p class="small muted">Nobody else who fits your settings has RSVP\'d yet.</p>'}
   </div>`;
+  document.querySelectorAll('#gw button[data-id]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true; const { data, error } = await SB.rpc('say_hi_plan',{ target:b.dataset.id, pid });
+    if(error){ b.disabled=false; return toast(error.message); }
+    b.textContent = data==='connected'?'Connected!':'Sent'; if(data==='connected') toast('You both said hi. Check Chats.');
+  });
   document.getElementById('bk').onclick=()=>openVenue(p.venue_id);
   document.getElementById('mi').onclick=()=>{ friends=Math.max(0,friends-1); document.getElementById('gl').textContent=label(); };
   document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
