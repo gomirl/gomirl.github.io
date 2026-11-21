@@ -218,40 +218,124 @@ function renderOnboard(){
 
 // ---------- map ----------
 async function renderMap(){
+  let view=null; try{ view=JSON.parse(localStorage.getItem('mirl_view')||'null'); }catch{}
+  const DELRAY=[26.4616,-80.0685];
   $app.innerHTML = `<div class="screen">
-    <div class="row between"><div><p class="small muted">Atlantic Ave · Delray Beach</p><h1>Tonight</h1></div>
-      <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Visible inside'}</span></div>
+    <div class="row between"><div><p class="small muted" id="area">Near you</p><h1>Tonight</h1></div>
+      <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Friends can see your spot'}</span></div>
     <div id="feat"></div>
-    <div id="map" role="region" aria-label="Map of Atlantic Ave venues"></div>
-    <p class="small muted">Numbers only. You see who's inside once you're there too, and only as avatars and handles.</p>
-    <h2>Spots</h2><div class="list" id="vlist"></div>
+    <div style="position:relative">
+      <div id="map" role="region" aria-label="Map of spots"></div>
+      <div id="xhair" hidden style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid var(--gold);border-radius:50%;z-index:900;pointer-events:none;box-shadow:0 0 0 3px rgba(0,0,0,.4)"></div>
+      <button class="btn sm" id="nearme" style="position:absolute;right:10px;bottom:10px;z-index:900;background:var(--surface);width:auto">📍 Near me</button>
+    </div>
+    <p class="small muted" id="mapmsg">Numbers only. You see who's inside once you're there too, and only as avatars and handles.</p>
+    <div id="addbox"></div>
+    <button class="btn" id="addspot">+ Add a missing spot</button>
+    <h2>Spots</h2><div class="list" id="vlist"><p class="small muted">Loading spots…</p></div>
   </div>`;
-  const [{ data:venues }, { data:feat }, { data:fc }] = await Promise.all([SB.rpc('venue_counts'), SB.rpc('featured_plan'), SB.rpc('friend_counts')]);
-  const FC={}; (fc||[]).forEach(r=>FC[r.venue_id]=r.friends_here); (venues||[]).forEach(v=>v.friends_here=FC[v.venue_id]||0);
-  S.venues = (venues||[]).sort((a,b)=>(b.members_here||0)-(a.members_here||0) || a.name.localeCompare(b.name));
-  if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
-    document.getElementById('feat').innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
-      <div class="date" style="color:var(--bg)"><span>${w.day}</span><b>${w.time}</b></div>
-      <div style="flex:1"><p class="small" style="font-weight:600;letter-spacing:.06em">THIS WEEK'S MIRL NIGHT</p><p style="font-family:var(--display);font-size:19px;font-weight:700">${esc(f.title)}</p><p class="small">${esc(f.venue)} · ${f.going} going</p></div></button>`;
-    document.getElementById('featb').onclick=()=>openPlan(f.plan_id);
-  }
   const el=document.getElementById('map');
-  S.map = L.map(el,{zoomControl:false,attributionControl:true}).setView([26.4616,-80.0685],16);
+  S.map = L.map(el,{zoomControl:false,attributionControl:true}).setView(view?[view.lat,view.lng]:DELRAY, view?.z||16);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(S.map);
-  S.venues.forEach(v=>{
-    const n=v.members_here, cls=n>=15?'pin hot':n>=5?'pin warm':'pin';
-    const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}${v.friends_here?' · 👥'+v.friends_here:''}</div>`,iconSize:null});
-    L.marker([v.lat,v.lng],{icon}).addTo(S.map).on('click',()=>openVenue(v.venue_id));
-  });
-  document.getElementById('vlist').innerHTML = S.venues.map(v=>`<button class="item" data-id="${v.venue_id}">
-     <div style="flex:1"><p style="font-weight:600">${esc(v.name)}</p></div>
-     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}${v.friends_here?` · <b style="color:var(--green)">${v.friends_here} friend${v.friends_here>1?'s':''}</b>`:''}</span></button>`).join('');
-  document.querySelectorAll('#vlist .item').forEach(b=>b.onclick=()=>openVenue(b.dataset.id));
+  const layer=L.layerGroup().addTo(S.map);
+  S.osmCache = S.osmCache || {};
+  let tmr, seq=0;
+  const load=async()=>{
+    const my=++seq, b=S.map.getBounds(), z=S.map.getZoom(), c=S.map.getCenter();
+    try{ localStorage.setItem('mirl_view', JSON.stringify({lat:c.lat,lng:c.lng,z})); }catch{}
+    const inDelray = Math.abs(c.lat-DELRAY[0])<0.03 && Math.abs(c.lng-DELRAY[1])<0.04;
+    document.getElementById('area').textContent = inDelray ? 'Atlantic Ave · Delray Beach · launch zone' : 'Near you';
+    const box={ s:b.getSouth(), w:b.getWest(), n:b.getNorth(), e:b.getEast() };
+    const [{ data:dbv }, { data:feat }, { data:fc }] = await Promise.all([SB.rpc('venue_counts_area',box), SB.rpc('featured_plan_area',box), SB.rpc('friend_counts')]);
+    if(my!==seq) return;
+    const FC={}; (fc||[]).forEach(r=>FC[r.venue_id]=r.friends_here);
+    let list=(dbv||[]).map(v=>({...v, friends_here:FC[v.venue_id]||0}));
+    // OpenStreetMap places not saved yet (only when zoomed in enough)
+    if(z>=15){
+      const key=[box.s,box.w,box.n,box.e].map(x=>x.toFixed(3)).join(',');
+      let osm=S.osmCache[key];
+      if(!osm){ try{
+        const q=`[out:json][timeout:15];(nwr["amenity"~"^(bar|pub|nightclub|restaurant|cafe|biergarten)$"]["name"](${box.s},${box.w},${box.n},${box.e}););out center 300;`;
+        const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+        const j=await r.json(); osm=(j.elements||[]).map(x=>({ osm_id:x.type[0]+x.id, name:x.tags.name, category:x.tags.amenity, address:[x.tags['addr:housenumber'],x.tags['addr:street']].filter(Boolean).join(' ')||null, lat:x.lat??x.center?.lat, lng:x.lon??x.center?.lon })).filter(x=>x.lat&&x.lng);
+        S.osmCache[key]=osm; }catch{ osm=[]; } }
+      if(my!==seq) return;
+      const have=new Set(list.map(v=>v.osm_id).filter(Boolean));
+      list=list.concat(osm.filter(o=>!have.has(o.osm_id)).map(o=>({...o, venue_id:null, members_here:null, friends_here:0, is_public:true})));
+    }
+    list.sort((a,b)=>(b.members_here||0)-(a.members_here||0) || (b.friends_here||0)-(a.friends_here||0) || a.name.localeCompare(b.name));
+    S.venues=list;
+    const featEl=document.getElementById('feat');
+    if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
+      featEl.innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
+        <div class="date" style="color:var(--bg)"><span>${w.day}</span><b>${w.time}</b></div>
+        <div style="flex:1"><p class="small" style="font-weight:600;letter-spacing:.06em">THIS WEEK'S MIRL NIGHT</p><p style="font-family:var(--display);font-size:19px;font-weight:700">${esc(f.title)}</p><p class="small">${esc(f.venue)} · ${f.going} going</p></div></button>`;
+      document.getElementById('featb').onclick=()=>openPlan(f.plan_id);
+    } else featEl.innerHTML='';
+    layer.clearLayers();
+    list.forEach((v,i)=>{
+      const n=v.members_here, cls=n>=15?'pin hot':n>=5?'pin warm':'pin';
+      const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}${v.friends_here?' · 👥'+v.friends_here:''}</div>`,iconSize:null});
+      L.marker([v.lat,v.lng],{icon}).addTo(layer).on('click',()=>goVenue(v));
+    });
+    const vl=document.getElementById('vlist');
+    vl.innerHTML = list.length ? list.slice(0,60).map((v,i)=>`<button class="item" data-i="${i}">
+       <div style="flex:1"><p style="font-weight:600">${esc(v.name)}</p>${v.category?`<p class="small muted">${esc(v.category)}</p>`:''}</div>
+       <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}${v.friends_here?` · <b style="color:var(--green)">${v.friends_here} friend${v.friends_here>1?'s':''}</b>`:''}</span></button>`).join('')
+      : `<p class="small muted">${z<15?'Zoom in to see spots.':'No spots here yet. Add one below the map.'}</p>`;
+    vl.querySelectorAll('.item').forEach(b=>b.onclick=()=>goVenue(list[+b.dataset.i]));
+  };
+  S.map.on('moveend',()=>{ clearTimeout(tmr); tmr=setTimeout(load,350); });
+  load();
+  document.getElementById('nearme').onclick=()=>{
+    if(!navigator.geolocation) return toast('Location is not available on this device.');
+    navigator.geolocation.getCurrentPosition(p=>S.map.setView([p.coords.latitude,p.coords.longitude],16), ()=>toast('Allow location to center the map. It stays on your phone.'), { timeout:10000 });
+  };
+  // add a missing spot
+  document.getElementById('addspot').onclick=()=>{
+    if(S.map.getZoom()<16) S.map.setZoom(17);
+    document.getElementById('xhair').hidden=false; document.getElementById('addspot').hidden=true;
+    const box=document.getElementById('addbox');
+    box.innerHTML=`<div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <p style="font-weight:600">Move the map so the gold circle is on the spot</p>
+      <label class="f">Name<input type="text" id="an" maxlength="80" placeholder="e.g. Joe's Tiki Bar"></label>
+      <label class="f">Type<select id="ac"><option value="bar">Bar</option><option value="restaurant">Restaurant</option><option value="nightclub">Club</option><option value="cafe">Cafe</option><option value="event_space">Event space</option><option value="other">Other public place</option></select></label>
+      <div id="near"></div><div class="err" id="aerr"></div>
+      <div class="row"><button class="btn" id="acancel">Cancel</button><button class="btn gold" id="asave">Add spot</button></div>
+      <p class="small muted">Public places only. New spots work for check-ins right away; plans open once we review them.</p></div>`;
+    const close=()=>{ box.innerHTML=''; document.getElementById('xhair').hidden=true; document.getElementById('addspot').hidden=false; };
+    document.getElementById('acancel').onclick=close;
+    let confirmed=false;
+    document.getElementById('asave').onclick=async()=>{
+      const name=document.getElementById('an').value.trim(), cat=document.getElementById('ac').value, c=S.map.getCenter(), err=document.getElementById('aerr');
+      if(name.length<2) return err.textContent='Give the spot a name.';
+      if(!confirmed){
+        const { data:nb } = await SB.rpc('venues_near',{ p_lat:c.lat, p_lng:c.lng });
+        const osmNear=(S.venues||[]).filter(v=>!v.venue_id && dist(c.lat,c.lng,v.lat,v.lng)<=100).map(v=>({ name:v.name, meters:Math.round(dist(c.lat,c.lng,v.lat,v.lng)), v }));
+        const all=[...(nb||[]).map(x=>({ name:x.name, meters:x.meters, id:x.venue_id })), ...osmNear].sort((a,b)=>a.meters-b.meters).slice(0,6);
+        if(all.length){ confirmed=true;
+          document.getElementById('near').innerHTML=`<p class="small" style="font-weight:600">Is it one of these?</p><div class="list" style="margin-top:6px">${all.map((x,i)=>`<button class="item" data-k="${i}"><div style="flex:1">${esc(x.name)}</div><span class="small muted">${x.meters} m</span></button>`).join('')}</div><p class="small muted" style="margin-top:6px">Not listed? Tap Add spot again.</p>`;
+          document.querySelectorAll('#near .item').forEach(b=>b.onclick=()=>{ const x=all[+b.dataset.k]; close(); x.id?openVenue(x.id):goVenue(x.v); });
+          return; }
+      }
+      const { data:id, error } = await SB.rpc('add_venue',{ p_name:name, p_cat:cat, p_lat:c.lat, p_lng:c.lng });
+      if(error) return err.textContent=error.message;
+      close(); toast('Spot added'); S.osmCache={}; await load(); openVenue(id);
+    };
+  };
+}
+async function goVenue(v){
+  if(!v.venue_id){
+    const { data:id, error } = await SB.rpc('save_osm_venue',{ p_osm:v.osm_id, p_name:v.name, p_cat:v.category||null, p_addr:v.address||null, p_lat:v.lat, p_lng:v.lng });
+    if(error) return toast('Could not open this spot');
+    v.venue_id=id;
+  }
+  openVenue(v.venue_id);
 }
 
 // ---------- venue ----------
 async function openVenue(id){
-  const v = S.venues.find(x=>x.venue_id===id) || (await SB.from('venues').select('id,name,lat,lng').eq('id',id).single()).data;
+  const v = S.venues.find(x=>x.venue_id===id) || (await SB.from('venues').select('id,name,lat,lng,is_public').eq('id',id).single()).data;
   const vid = v.venue_id||v.id;
   const now=new Date(), wk=new Date(Date.now()+7*864e5);
   const { data:plans } = await SB.from('plans').select('id,title,starts_at,visibility').eq('venue_id',vid).gte('starts_at', new Date(Date.now()-6*36e5).toISOString()).lte('starts_at',wk.toISOString()).order('starts_at');
@@ -265,11 +349,11 @@ async function openVenue(id){
     <div class="err" id="err"></div>
     <h2>Plans here this week</h2>
     <div class="list" id="pl">${(plans||[]).length? plans.map(p=>{const w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${p.visibility==='open'?'Open':'Invite-only'}</p></div></button>`}).join('') : '<p class="small muted">No plans yet. Start one.</p>'}</div>
-    <button class="btn" id="np">+ Start a plan here</button>
+    ${v.is_public===false?'<p class="small muted">New spot added by a member. Plans open here once it\'s reviewed.</p>':'<button class="btn" id="np">+ Start a plan here</button>'}
     <p class="small muted">Listing from public map data. Own ${esc(v.name)}? Email hello@gomirl.com to claim it free.</p>
   </div>`;
   document.getElementById('bk').onclick=()=>setTab('map');
-  document.getElementById('np').onclick=()=>newPlan(vid, v.name);
+  const npb=document.getElementById('np'); if(npb) npb.onclick=()=>newPlan(vid, v.name);
   document.querySelectorAll('#pl .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
   document.getElementById('ci').onclick=()=>{
     const err=document.getElementById('err'); err.textContent='Checking your location…';
@@ -314,7 +398,7 @@ function newPlan(vid, vname){
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Back</button>
     <h1>Start a plan</h1>
-    ${vid?`<p class="muted">at ${esc(vname)}</p>`:`<label class="f">Where<select id="ven">${S.venues.map(v=>`<option value="${v.venue_id}">${esc(v.name)}</option>`).join('')}</select></label>`}
+    ${vid?`<p class="muted">at ${esc(vname)}</p>`:`<label class="f">Where<select id="ven">${(S.venues||[]).map((v,i)=>v.is_public===false?'':`<option value="${i}">${esc(v.name)}</option>`).join('')||'<option value="">Open the map first to pick a spot</option>'}</select></label>`}
     <label class="f">What<input type="text" id="ti" maxlength="80" placeholder="Salsa night, beginners welcome"></label>
     <label class="f">When<input type="datetime-local" id="wh" value="${local}"></label>
     <div class="seg" style="grid-template-columns:1fr 1fr" id="vis"><button aria-pressed="true" data-v="open">Open to members</button><button aria-pressed="false" data-v="invite">Invite-only</button></div>
@@ -328,7 +412,10 @@ function newPlan(vid, vname){
   document.getElementById('go').onclick=async()=>{
     const err=document.getElementById('err'); const title=document.getElementById('ti').value.trim();
     if(title.length<3) return err.textContent='Give it a short name.';
-    const venue_id = vid || document.getElementById('ven').value;
+    let venue_id = vid;
+    if(!venue_id){ const sel=S.venues?.[+document.getElementById('ven').value]; if(!sel) return err.textContent='Pick a spot.';
+      if(!sel.venue_id){ const { data:id, error:e2 } = await SB.rpc('save_osm_venue',{ p_osm:sel.osm_id, p_name:sel.name, p_cat:sel.category||null, p_addr:sel.address||null, p_lat:sel.lat, p_lng:sel.lng }); if(e2) return err.textContent='Could not use that spot.'; sel.venue_id=id; }
+      venue_id=sel.venue_id; }
     const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis }).select('id,invite_code').single();
     if(error) return err.textContent='Could not post: '+error.message;
     await SB.from('plan_members').upsert({ plan_id:data.id, user_id:S.user.id, friends:0 });
