@@ -302,7 +302,7 @@ async function openInside(vid, name){
   document.querySelectorAll('#ppl button[data-id]').forEach(b=>b.onclick=async()=>{
     b.disabled=true; const { data, error } = await SB.rpc('say_hi',{ target:b.dataset.id });
     if(error){ b.disabled=false; return toast(error.message); }
-    b.textContent = data==='connected'?'Connected!':'Sent'; if(data==='connected') toast('You both said hi. Chat is open for 14 hours.');
+    b.textContent = data==='connected'?'Connected!':'Sent'; if(data==='connected') toast('You both said hi. Your chat is open in Chats.');
   });
 }
 
@@ -392,7 +392,7 @@ async function renderChats(){
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
       return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
-      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Add friend to keep it.</p>'}</div></div>`;
+      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h if quiet · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here. It stays open as long as you keep talking, and disappears after 14 quiet hours unless you both tap Add friend.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
 }
 async function openChat(cid){
