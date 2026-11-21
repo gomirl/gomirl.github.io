@@ -156,7 +156,7 @@ function renderWelcome(){
   $app.innerHTML = `<div class="screen hero">
     <div class="logo">mirl</div>
     <h1 style="font-size:40px">Meet in<br>real life.</h1>
-    <p class="muted">See where your kind of people are going on Atlantic Ave, join a plan, or start your own.</p>
+    <p class="muted">See where your kind of people are going tonight, join a plan, or start your own. Launching first on Atlantic Ave in Delray Beach.</p>
     <div style="flex:1"></div>
     <button class="btn white" id="g">Continue with Google</button>
     <button class="btn" id="f">Continue with Facebook</button>
@@ -250,22 +250,11 @@ async function renderMap(){
     if(my!==seq) return;
     const FC={}; (fc||[]).forEach(r=>FC[r.venue_id]=r.friends_here);
     let list=(dbv||[]).map(v=>({...v, friends_here:FC[v.venue_id]||0}));
-    // OpenStreetMap places not saved yet (only when zoomed in enough)
-    if(z>=15){
-      const key=[box.s,box.w,box.n,box.e].map(x=>x.toFixed(3)).join(',');
-      let osm=S.osmCache[key];
-      if(!osm){ try{
-        const q=`[out:json][timeout:15];(nwr["amenity"~"^(bar|pub|nightclub|restaurant|cafe|biergarten)$"]["name"](${box.s},${box.w},${box.n},${box.e}););out center 300;`;
-        const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-        const j=await r.json(); osm=(j.elements||[]).map(x=>({ osm_id:x.type[0]+x.id, name:x.tags.name, category:x.tags.amenity, address:[x.tags['addr:housenumber'],x.tags['addr:street']].filter(Boolean).join(' ')||null, lat:x.lat??x.center?.lat, lng:x.lon??x.center?.lon })).filter(x=>x.lat&&x.lng);
-        S.osmCache[key]=osm; }catch{ osm=[]; } }
-      if(my!==seq) return;
-      const have=new Set(list.map(v=>v.osm_id).filter(Boolean));
-      list=list.concat(osm.filter(o=>!have.has(o.osm_id)).map(o=>({...o, venue_id:null, members_here:null, friends_here:0, is_public:true})));
-    }
-    list.sort((a,b)=>(b.members_here||0)-(a.members_here||0) || (b.friends_here||0)-(a.friends_here||0) || a.name.localeCompare(b.name));
-    S.venues=list;
-    const featEl=document.getElementById('feat');
+    const sortL=l=>l.sort((a,b)=>(b.members_here||0)-(a.members_here||0) || (b.friends_here||0)-(a.friends_here||0) || a.name.localeCompare(b.name));
+    sortL(list); S.venues=list;
+    const draw=list=>{
+      if(!document.getElementById('vlist')) return;
+      const featEl=document.getElementById('feat');
     if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
       featEl.innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
         <div class="date" style="color:var(--bg)"><span>${w.day}</span><b>${w.time}</b></div>
@@ -284,6 +273,29 @@ async function renderMap(){
        <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}${v.friends_here?` · <b style="color:var(--green)">${v.friends_here} friend${v.friends_here>1?'s':''}</b>`:''}</span></button>`).join('')
       : `<p class="small muted">${z<15?'Zoom in to see spots.':'No spots here yet. Add one below the map.'}</p>`;
     vl.querySelectorAll('.item').forEach(b=>b.onclick=()=>goVenue(list[+b.dataset.i]));
+      };
+    draw(list);
+    // OpenStreetMap places not saved yet, loaded in the background (zoomed in only)
+    if(z>=15){
+      const key=[box.s,box.w,box.n,box.e].map(x=>x.toFixed(3)).join(',');
+      let osm=S.osmCache[key];
+      if(!osm){
+        const q=`[out:json][timeout:12];(nwr["amenity"~"^(bar|pub|nightclub|restaurant|cafe|biergarten)$"]["name"](${box.s},${box.w},${box.n},${box.e}););out center 300;`;
+        for(const host of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter']){
+          try{ const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),8000);
+            const r=await fetch(host,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal}); clearTimeout(t);
+            if(!r.ok) continue; const j=await r.json();
+            osm=(j.elements||[]).map(x=>({ osm_id:x.type[0]+x.id, name:x.tags.name, category:x.tags.amenity, address:[x.tags['addr:housenumber'],x.tags['addr:street']].filter(Boolean).join(' ')||null, lat:x.lat??x.center?.lat, lng:x.lon??x.center?.lon })).filter(x=>x.lat&&x.lng);
+            S.osmCache[key]=osm; break;
+          }catch{}
+          if(my!==seq) return;
+        }
+      }
+      if(my!==seq || !osm) return;
+      const have=new Set(list.map(v=>v.osm_id).filter(Boolean));
+      const more=osm.filter(o=>!have.has(o.osm_id)).map(o=>({...o, venue_id:null, members_here:null, friends_here:0, is_public:true}));
+      if(more.length){ list=sortL(list.concat(more)); S.venues=list; draw(list); }
+    }
   };
   S.map.on('moveend',()=>{ clearTimeout(tmr); tmr=setTimeout(load,350); });
   load();
