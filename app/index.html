@@ -159,13 +159,12 @@ function renderWelcome(){
     <p class="muted">See where your kind of people are going tonight, join a plan, or start your own. Launching first on Atlantic Ave in Delray Beach.</p>
     <div style="flex:1"></div>
     <button class="btn white" id="g">Continue with Google</button>
-    <button class="btn" id="f">Continue with Facebook</button>
+    <p class="small muted" style="text-align:center">Facebook sign-in coming soon. Use Google for now.</p>
     <p class="small muted" style="text-align:center">18+ only. Nobody sees you unless you're inside the same spot.</p>
     <p class="small muted" style="text-align:center">Early test version for Founding Members. <a href="/privacy/">Privacy</a></p>
   </div>`;
   const go = provider => SB.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin + location.pathname } });
   document.getElementById('g').onclick = ()=>go('google');
-  document.getElementById('f').onclick = ()=>go('facebook');
 }
 
 // ---------- onboarding ----------
