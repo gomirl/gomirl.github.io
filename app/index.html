@@ -226,7 +226,8 @@ async function renderMap(){
     <p class="small muted">Numbers only. You see who's inside once you're there too, and only as avatars and handles.</p>
     <h2>Spots</h2><div class="list" id="vlist"></div>
   </div>`;
-  const [{ data:venues }, { data:feat }] = await Promise.all([SB.rpc('venue_counts'), SB.rpc('featured_plan')]);
+  const [{ data:venues }, { data:feat }, { data:fc }] = await Promise.all([SB.rpc('venue_counts'), SB.rpc('featured_plan'), SB.rpc('friend_counts')]);
+  const FC={}; (fc||[]).forEach(r=>FC[r.venue_id]=r.friends_here); (venues||[]).forEach(v=>v.friends_here=FC[v.venue_id]||0);
   S.venues = (venues||[]).sort((a,b)=>(b.members_here||0)-(a.members_here||0) || a.name.localeCompare(b.name));
   if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
     document.getElementById('feat').innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
@@ -239,12 +240,12 @@ async function renderMap(){
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(S.map);
   S.venues.forEach(v=>{
     const n=v.members_here, cls=n>=15?'pin hot':n>=5?'pin warm':'pin';
-    const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}</div>`,iconSize:null});
+    const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}${v.friends_here?' · 👥'+v.friends_here:''}</div>`,iconSize:null});
     L.marker([v.lat,v.lng],{icon}).addTo(S.map).on('click',()=>openVenue(v.venue_id));
   });
   document.getElementById('vlist').innerHTML = S.venues.map(v=>`<button class="item" data-id="${v.venue_id}">
      <div style="flex:1"><p style="font-weight:600">${esc(v.name)}</p></div>
-     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}</span></button>`).join('');
+     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Quiet'}${v.friends_here?` · <b style="color:var(--green)">${v.friends_here} friend${v.friends_here>1?'s':''}</b>`:''}</span></button>`).join('');
   document.querySelectorAll('#vlist .item').forEach(b=>b.onclick=()=>openVenue(b.dataset.id));
 }
 
@@ -258,7 +259,7 @@ async function openVenue(id){
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Back to map</button>
     <h1>${esc(v.name)}</h1>
-    <div class="card"><p style="font-family:var(--display);font-size:30px;font-weight:700;color:var(--gold)">${v.members_here||0}</p><p class="small muted">members inside now</p></div>
+    <div class="card"><p style="font-family:var(--display);font-size:30px;font-weight:700;color:var(--gold)">${v.members_here||0}</p><p class="small muted">members inside now${v.friends_here?` · <b style="color:var(--green)">${v.friends_here} of your friends</b>`:''}</p></div>
     <button class="btn gold" id="ci">I'm here · check in</button>
     <p class="small muted">Uses your location once, only to confirm you're at ${esc(v.name)}. You're checked out when you leave or after 3 hours.</p>
     <div class="err" id="err"></div>
@@ -391,19 +392,25 @@ async function renderChats(){
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
       return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
-      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Kept by both of you':mineKept?'You kept it · waiting on them':'Disappears in '+hrs+'h'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Keep to save it.</p>'}</div></div>`;
+      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Add friend to keep it.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
 }
 async function openChat(cid){
   const { data:msgs } = await SB.from('messages').select('*').eq('connection_id',cid).order('created_at');
   $app.innerHTML = `<div class="screen">
-    <div class="row between"><button class="back" id="bk">‹ Chats</button><button class="btn sm gold" id="kp">Keep</button></div>
+    <div class="row between"><button class="back" id="bk">‹ Chats</button><button class="btn sm gold" id="kp">Add friend</button></div>
     <div id="msgs" style="display:flex;flex-direction:column;gap:8px">${(msgs||[]).map(m=>`<div class="bubble ${m.sender===S.user.id?'me':''}" data-id="${m.id}">${esc(m.body)}</div>`).join('')||'<p class="small muted" id="nomsg">Say something nice. Then go say it in person.</p>'}</div>
     <div class="row"><input type="text" id="tx" maxlength="1000" placeholder="Message"><button class="btn sm violet" id="sd">Send</button></div>
     <button class="btn" id="bl" style="color:var(--red)">Block or report</button>
   </div>`;
   document.getElementById('bk').onclick=()=>setTab('chats');
-  document.getElementById('kp').onclick=async()=>{ await SB.rpc('keep_connection',{ cid }); toast('Kept. It stays if they keep it too.'); };
+  const kp=document.getElementById('kp');
+  const kpState=c=>{ if(!c) return; const mine=c.user_a===S.user.id?c.kept_a:c.kept_b, both=c.kept_a&&c.kept_b;
+    kp.textContent = both?'Friends ✓':mine?'Request sent':'Add friend'; kp.disabled = mine||both; if(both) kp.className='btn sm'; };
+  SB.from('connections').select('user_a,kept_a,kept_b').eq('id',cid).maybeSingle().then(({data})=>kpState(data));
+  kp.onclick=async()=>{ const { error } = await SB.rpc('keep_connection',{ cid }); if(error) return toast(error.message);
+    const { data } = await SB.from('connections').select('user_a,kept_a,kept_b').eq('id',cid).maybeSingle(); kpState(data);
+    toast(data&&data.kept_a&&data.kept_b ? "You're friends now. This chat stays." : "Friend request sent. You'll be friends when they add you too."); };
   const box=document.getElementById('msgs');
   const addMsg=m=>{ if(!document.body.contains(box) || box.querySelector(`[data-id="${m.id}"]`)) return; document.getElementById('nomsg')?.remove();
     const d=document.createElement('div'); d.className='bubble'+(m.sender===S.user.id?' me':''); d.dataset.id=m.id; d.textContent=m.body; box.appendChild(d); d.scrollIntoView({block:'end',behavior:'smooth'}); };
@@ -447,7 +454,7 @@ function renderMe(needHandle){
       <div class="chips" id="dchips">${DESIRES.map(i=>`<button class="chip" aria-pressed="${!!dpick[i]}">${esc(i)}</button>`).join('')}</div>
     </div>
     <h2>Privacy</h2>
-    <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">You're hidden until you check in, either way. Off lets members inside your spot find you right away.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
+    <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">On: your friends can't see where you are. Off: your spot counts toward "friends here" on their map. A small number can still hint it's you, so leave it on if you'd rather not be found. Strangers never see you unless they're inside the same spot, either way.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
     <button class="btn gold" id="sv">Save</button>
     <button class="btn" id="so">Sign out</button>
     ${window.matchMedia('(display-mode: standalone)').matches||navigator.standalone?'':'<div class="card"><p style="font-weight:600">Put MIRL on your home screen</p><p class="small muted">iPhone: tap Share, then Add to Home Screen. Android: tap the ⋮ menu, then Add to Home screen.</p></div>'}
