@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#12101C">
+<title>MIRL</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+:root{--bg:#12101C;--surface:#1D1A2B;--surface2:#272338;--line:#2F2A44;--ink:#F4F1FA;--muted:#B4ADC8;--gold:#DCD03A;--violet:#7B78FF;--green:#45BE85;--red:#FF8A7A;
+--display:'Space Grotesk',system-ui,sans-serif;--body:Inter,system-ui,-apple-system,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.screen{flex:1;padding:max(24px,env(safe-area-inset-top)) 20px 110px;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-weight:700;font-size:28px;margin:0;line-height:1.05}
+h2{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 0}
+p{margin:0;line-height:1.45}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 18px;border-radius:25px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer;text-decoration:none;color:var(--ink);width:100%}
+.btn.gold{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+.btn.violet{background:var(--violet);color:var(--bg);border-color:var(--violet)}
+.btn.white{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.sm{min-height:40px;width:auto;padding:0 14px;font-size:14px}
+.btn:disabled{opacity:.5;cursor:default}
+label.f{display:grid;gap:6px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=date],input[type=datetime-local],input[type=number],select,textarea{width:100%;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:10px 12px;color:var(--ink)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.seg button,.chip{min-height:44px;border-radius:22px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer;padding:0 10px}
+.seg button[aria-pressed=true]{background:var(--violet);border-color:var(--violet);color:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:38px;font-weight:500}
+.chip[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:var(--bg)}
+.row{display:flex;align-items:center;gap:12px}
+.row.between{justify-content:space-between}
+.switch{width:52px;height:30px;flex-shrink:0;border-radius:15px;border:none;padding:3px;cursor:pointer;display:flex;background:#3A3452}
+.switch::after{content:"";width:24px;height:24px;border-radius:50%;background:var(--bg)}
+.switch[aria-checked=true]{background:var(--gold);justify-content:flex-end}
+.avatar{width:48px;height:48px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font:700 18px var(--display);color:var(--bg);background:var(--violet);overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:#171424;border-top:1px solid var(--line);padding:8px 8px max(14px,env(safe-area-inset-bottom));z-index:1000}
+nav.tabs .in{max-width:480px;width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+nav.tabs button{background:none;border:none;color:var(--muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;cursor:pointer}
+nav.tabs button[aria-current=page]{color:var(--gold);font-weight:600}
+nav.tabs svg{width:22px;height:22px}
+#map{height:46vh;min-height:300px;border-radius:22px;overflow:hidden;border:1px solid var(--line)}
+.leaflet-container{background:#1A1727;font-family:var(--body)}
+.pin{background:var(--surface2);color:var(--ink);border:1px solid #3A3452;border-radius:14px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.pin.hot{background:var(--gold);color:var(--bg);border-color:var(--gold)}
+.pin.warm{background:var(--violet);color:var(--bg);border-color:var(--violet)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
+.date{display:flex;flex-direction:column;align-items:center;width:44px;color:var(--gold);flex-shrink:0}
+.date b{font-family:var(--display);font-size:20px}
+.date span{font-size:11px;font-weight:600}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-weight:600;font-size:14px;z-index:2000;max-width:90vw;text-align:center}
+.err{color:var(--red);font-size:13px;min-height:1em}
+.back{background:none;border:none;color:var(--muted);padding:0;cursor:pointer;font-size:14px;text-align:left}
+.bubble{max-width:80%;padding:10px 14px;border-radius:18px;background:var(--surface2);align-self:flex-start;line-height:1.35}
+.bubble.me{background:var(--violet);color:var(--bg);align-self:flex-end}
+.hero{display:flex;flex-direction:column;gap:14px;padding-top:30px}
+.logo{font-family:var(--display);font-weight:700;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,#5E66FF,#8A2BFF);-webkit-background-clip:text;color:transparent}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="tabs" id="tabs" hidden><div class="in">
+  <button data-tab="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Map</button>
+  <button data-tab="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Plans</button>
+  <button data-tab="chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chats</button>
+  <button data-tab="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg>Living Room</button>
+</div></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SB = supabase.createClient('https://mvgqkliypebyiwqssxbu.supabase.co','sb_publishable_0818FosZ3hllftazzKvlyQ_s9t-qruJ');
+const INTERESTS=['Live music','Craft beer','Wine bars','Beach days','Boating','Yoga','Dogs','Trivia nights','Salsa','Comedy','Foodie','Golf','Art walks','Karaoke','Sports bars','Concerts'];
+const CHECKIN_RADIUS_M = 120;
+const S = { user:null, profile:null, tab:'map', venues:[], map:null };
+const $app = document.getElementById('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function dist(a,b,c,d){ const R=6371000,r=x=>x*Math.PI/180; const dl=r(c-a), dn=r(d-b); const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function when(ts){ const d=new Date(ts); return { day:d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase(), time:d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(':00','').replace(' ','') }; }
+function initials(n){ return esc((n||'?').trim()[0]||'?').toUpperCase(); }
+function setTab(t){ S.tab=t; document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current', b.dataset.tab===t?'page':'false')); render(); }
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+
+// ---------- boot ----------
+async function boot(){
+  const { data:{ session } } = await SB.auth.getSession();
+  S.user = session?.user || null;
+  SB.auth.onAuthStateChange((_e, s)=>{ const was=S.user?.id; S.user=s?.user||null; if(was!==S.user?.id) loadProfile(); });
+  await loadProfile();
+}
+async function loadProfile(){
+  if(!S.user){ S.profile=null; return render(); }
+  const { data } = await SB.from('profiles').select('*').eq('id', S.user.id).maybeSingle();
+  S.profile = data; render();
+}
+function render(){
+  document.getElementById('tabs').hidden = !(S.user && S.profile);
+  if(!S.user) return renderWelcome();
+  if(!S.profile) return renderOnboard();
+  ({map:renderMap, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
+}
+
+// ---------- welcome / sign in ----------
+function renderWelcome(){
+  $app.innerHTML = `<div class="screen hero">
+    <div class="logo">mirl</div>
+    <h1 style="font-size:40px">Meet in<br>real life.</h1>
+    <p class="muted">See where your kind of people are going on Atlantic Ave, join a plan, or start your own.</p>
+    <div style="flex:1"></div>
+    <button class="btn white" id="g">Continue with Google</button>
+    <button class="btn" id="f">Continue with Facebook</button>
+    <p class="small muted" style="text-align:center">18+ only. Nobody sees you unless you're inside the same spot.</p>
+    <p class="small muted" style="text-align:center">Early test version for Founding Members.</p>
+  </div>`;
+  const go = provider => SB.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin + location.pathname } });
+  document.getElementById('g').onclick = ()=>go('google');
+  document.getElementById('f').onclick = ()=>go('facebook');
+}
+
+// ---------- onboarding ----------
+function renderOnboard(){
+  const meta = S.user.user_metadata||{};
+  const first = (meta.full_name||meta.name||'').split(' ')[0];
+  const st = { mode:'both', picked:{} };
+  $app.innerHTML = `<div class="screen">
+    <h1>Welcome to MIRL</h1>
+    <p class="muted">A few basics. Only your first name and age are ever shown, and only inside the same spot.</p>
+    <label class="f">First name<input type="text" id="fn" maxlength="40" value="${esc(first)}" autocomplete="given-name"></label>
+    <label class="f">Birthday (must be 18+)<input type="date" id="bd" max="${new Date(Date.now()-18*365.25*864e5).toISOString().slice(0,10)}"></label>
+    <h2>I'm looking for</h2>
+    <div class="seg" id="mode"><button data-v="dating" aria-pressed="false">Dating</button><button data-v="both" aria-pressed="true">Open to both</button><button data-v="friends" aria-pressed="false">Friends</button></div>
+    <label class="f">I am<select id="gender"><option value="">Choose…</option><option>woman</option><option>man</option><option>nonbinary</option></select></label>
+    <label class="f">Show me<select id="show"><option value="">Everyone</option><option value="man">Men</option><option value="woman">Women</option></select></label>
+    <h2>Tap what you're into</h2>
+    <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="false">${esc(i)}</button>`).join('')}</div>
+    <label class="row small muted" style="gap:10px"><input type="checkbox" id="terms" style="width:20px;height:20px">I'm 18 or older and agree to be respectful. Block and report are always one tap away.</label>
+    <div class="err" id="err"></div>
+    <button class="btn gold" id="save">Save and see the map</button>
+  </div>`;
+  document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ st.mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed', x===b)); });
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); st.picked[b.textContent]=on; });
+  document.getElementById('save').onclick = async ()=>{
+    const err=document.getElementById('err');
+    const fn=document.getElementById('fn').value.trim(), bd=document.getElementById('bd').value;
+    if(!fn) return err.textContent='Add your first name.';
+    if(!bd) return err.textContent='Add your birthday.';
+    if((Date.now()-new Date(bd))/(365.25*864e5) < 18) return err.textContent='MIRL is 18+ only.';
+    if(!document.getElementById('terms').checked) return err.textContent='Please check the box to continue.';
+    const show=document.getElementById('show').value;
+    const row={ id:S.user.id, first_name:fn, birth_date:bd, mode:st.mode, gender:document.getElementById('gender').value||null,
+      show_genders: show?[show]:[], interests:Object.keys(st.picked).filter(k=>st.picked[k]), avatar_url: meta.avatar_url||meta.picture||null };
+    const { error } = await SB.from('profiles').insert(row);
+    if(error) return err.textContent = error.message.includes('birth_date') ? 'MIRL is 18+ only.' : 'Could not save: '+error.message;
+    toast('Welcome to MIRL'); loadProfile();
+  };
+}
+
+// ---------- map ----------
+async function renderMap(){
+  $app.innerHTML = `<div class="screen">
+    <div class="row between"><div><p class="small muted">Atlantic Ave · Delray Beach</p><h1>Tonight</h1></div>
+      <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Visible inside'}</span></div>
+    <div id="feat"></div>
+    <div id="map" role="region" aria-label="Map of Atlantic Ave venues"></div>
+    <p class="small muted">Numbers only. You see who's inside once you're there too. Spots under 5 show no count.</p>
+    <h2>Spots</h2><div class="list" id="vlist"></div>
+  </div>`;
+  const [{ data:venues }, { data:feat }] = await Promise.all([SB.rpc('venue_counts'), SB.rpc('featured_plan')]);
+  S.venues = (venues||[]).sort((a,b)=>(b.members_here||0)-(a.members_here||0) || a.name.localeCompare(b.name));
+  if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
+    document.getElementById('feat').innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
+      <div class="date" style="color:var(--bg)"><span>${w.day}</span><b>${w.time}</b></div>
+      <div style="flex:1"><p class="small" style="font-weight:600;letter-spacing:.06em">THIS WEEK'S MIRL NIGHT</p><p style="font-family:var(--display);font-size:19px;font-weight:700">${esc(f.title)}</p><p class="small">${esc(f.venue)} · ${f.going} going</p></div></button>`;
+    document.getElementById('featb').onclick=()=>openPlan(f.plan_id);
+  }
+  const el=document.getElementById('map');
+  S.map = L.map(el,{zoomControl:false,attributionControl:true}).setView([26.4616,-80.0685],16);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(S.map);
+  S.venues.forEach(v=>{
+    const n=v.members_here, cls=n>=15?'pin hot':n>=5?'pin warm':'pin';
+    const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}</div>`,iconSize:null});
+    L.marker([v.lat,v.lng],{icon}).addTo(S.map).on('click',()=>openVenue(v.venue_id));
+  });
+  document.getElementById('vlist').innerHTML = S.venues.map(v=>`<button class="item" data-id="${v.venue_id}">
+     <div style="flex:1"><p style="font-weight:600">${esc(v.name)}</p></div>
+     <span class="small ${v.members_here?'':'muted'}">${v.members_here?v.members_here+' here':'Under 5'}</span></button>`).join('');
+  document.querySelectorAll('#vlist .item').forEach(b=>b.onclick=()=>openVenue(b.dataset.id));
+}
+
+// ---------- venue ----------
+async function openVenue(id){
+  const v = S.venues.find(x=>x.venue_id===id) || (await SB.from('venues').select('id,name,lat,lng').eq('id',id).single()).data;
+  const vid = v.venue_id||v.id;
+  const now=new Date(), wk=new Date(Date.now()+7*864e5);
+  const { data:plans } = await SB.from('plans').select('id,title,starts_at,visibility').eq('venue_id',vid).gte('starts_at', new Date(Date.now()-6*36e5).toISOString()).lte('starts_at',wk.toISOString()).order('starts_at');
+  document.getElementById('tabs').hidden=false;
+  $app.innerHTML = `<div class="screen">
+    <button class="back" id="bk">‹ Back to map</button>
+    <h1>${esc(v.name)}</h1>
+    <div class="card"><p style="font-family:var(--display);font-size:30px;font-weight:700;color:var(--gold)">${v.members_here||'Under 5'}</p><p class="small muted">members inside now</p></div>
+    <button class="btn gold" id="ci">I'm here · check in</button>
+    <p class="small muted">Uses your location once, only to confirm you're at ${esc(v.name)}. You're checked out when you leave or after 3 hours.</p>
+    <div class="err" id="err"></div>
+    <h2>Plans here this week</h2>
+    <div class="list" id="pl">${(plans||[]).length? plans.map(p=>{const w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${p.visibility==='open'?'Open':'Invite-only'}</p></div></button>`}).join('') : '<p class="small muted">No plans yet. Start one.</p>'}</div>
+    <button class="btn" id="np">+ Start a plan here</button>
+    <p class="small muted">Listing from public map data. Own ${esc(v.name)}? Email hello@gomirl.com to claim it free.</p>
+  </div>`;
+  document.getElementById('bk').onclick=()=>setTab('map');
+  document.getElementById('np').onclick=()=>newPlan(vid, v.name);
+  document.querySelectorAll('#pl .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+  document.getElementById('ci').onclick=()=>{
+    const err=document.getElementById('err'); err.textContent='Checking your location…';
+    if(!navigator.geolocation) return err.textContent='Location is not available on this device.';
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const d=dist(pos.coords.latitude,pos.coords.longitude,v.lat,v.lng);
+      if(d > CHECKIN_RADIUS_M + Math.min(pos.coords.accuracy||0,100)) return err.textContent=`You look about ${Math.round(d)} m away. Check in once you're inside.`;
+      const { error } = await SB.rpc('check_in',{ venue: vid });
+      if(error) return err.textContent='Could not check in: '+error.message;
+      err.textContent=''; toast('Checked in'); openInside(vid, v.name);
+    }, ()=>{ err.textContent='Allow location to check in. MIRL only asks when you tap this button.'; }, { enableHighAccuracy:true, timeout:10000 });
+  };
+}
+
+// ---------- inside (people here) ----------
+async function openInside(vid, name){
+  const { data:people, error } = await SB.rpc('people_here');
+  $app.innerHTML = `<div class="screen">
+    <button class="back" id="bk">‹ Map</button>
+    <p class="small muted">Checked in</p><h1>${esc(name)}</h1>
+    <div class="row between"><h2>Here now · best matches first</h2><span class="small muted">Visible only inside</span></div>
+    <div class="list" id="ppl">${error?'<p class="err">'+esc(error.message)+'</p>':(people||[]).length? people.map(p=>`<div class="item" style="cursor:default">
+      <div class="avatar">${p.photo_url||p.avatar_url?`<img src="${esc(p.photo_url||p.avatar_url)}" alt="">`:initials(p.first_name)}</div>
+      <div style="flex:1;min-width:0"><p style="font-weight:600">${esc(p.first_name)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
+      <p class="small muted">${p.shared_interests?p.shared_interests+' shared interest'+(p.shared_interests>1?'s':''):''}</p></div>
+      <button class="btn gold sm" data-id="${p.id}">Say hi</button></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
+    <p class="small muted">"Open to casual" only shows when you both turned it on.</p>
+  </div>`;
+  document.getElementById('bk').onclick=()=>setTab('map');
+  document.querySelectorAll('#ppl button[data-id]').forEach(b=>b.onclick=async()=>{
+    b.disabled=true; const { data, error } = await SB.rpc('say_hi',{ target:b.dataset.id });
+    if(error){ b.disabled=false; return toast(error.message); }
+    b.textContent = data==='connected'?'Connected!':'Sent'; if(data==='connected') toast('You both said hi. Chat is open for 14 hours.');
+  });
+}
+
+// ---------- plans ----------
+function newPlan(vid, vname){
+  const def=new Date(Date.now()+864e5); def.setHours(21,0,0,0);
+  const local=new Date(def-def.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  let vis='open';
+  $app.innerHTML = `<div class="screen">
+    <button class="back" id="bk">‹ Back</button>
+    <h1>Start a plan</h1>
+    ${vid?`<p class="muted">at ${esc(vname)}</p>`:`<label class="f">Where<select id="ven">${S.venues.map(v=>`<option value="${v.venue_id}">${esc(v.name)}</option>`).join('')}</select></label>`}
+    <label class="f">What<input type="text" id="ti" maxlength="80" placeholder="Salsa night, beginners welcome"></label>
+    <label class="f">When<input type="datetime-local" id="wh" value="${local}"></label>
+    <div class="seg" style="grid-template-columns:1fr 1fr" id="vis"><button aria-pressed="true" data-v="open">Open to members</button><button aria-pressed="false" data-v="invite">Invite-only</button></div>
+    <p class="small muted" id="vnote">Shows on the map to members who fit your settings.</p>
+    <div class="err" id="err"></div>
+    <button class="btn violet" id="go">Post plan</button>
+    <p class="small muted">Public venues only. Hosts follow the same 18+, block and report rules.</p>
+  </div>`;
+  document.getElementById('bk').onclick=()=> vid?openVenue(vid):setTab('plans');
+  document.querySelectorAll('#vis button').forEach(b=>b.onclick=()=>{ vis=b.dataset.v; document.querySelectorAll('#vis button').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('vnote').textContent = vis==='open'?'Shows on the map to members who fit your settings.':'Only people you send the link to can see and join.'; });
+  document.getElementById('go').onclick=async()=>{
+    const err=document.getElementById('err'); const title=document.getElementById('ti').value.trim();
+    if(title.length<3) return err.textContent='Give it a short name.';
+    const venue_id = vid || document.getElementById('ven').value;
+    const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis }).select('id,invite_code').single();
+    if(error) return err.textContent='Could not post: '+error.message;
+    await SB.from('plan_members').upsert({ plan_id:data.id, user_id:S.user.id, friends:0 });
+    if(vis==='invite'){ const link=location.origin+location.pathname+'#join='+data.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } }
+    else toast('Plan posted');
+    openPlan(data.id);
+  };
+}
+async function openPlan(pid){
+  const { data:p } = await SB.from('plans').select('id,title,starts_at,visibility,host_id,invite_code,venue_id,venues(name)').eq('id',pid).single();
+  if(!p) return toast('Plan not found');
+  const { data:mine } = await SB.from('plan_members').select('friends').eq('plan_id',pid).eq('user_id',S.user.id).maybeSingle();
+  let friends = mine?.friends||0; const w=when(p.starts_at);
+  const label=()=>friends===0?'Just me':'Me + '+friends+(friends===1?' friend':' friends');
+  $app.innerHTML = `<div class="screen">
+    <button class="back" id="bk">‹ Back</button>
+    <div class="row"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div><h1>${esc(p.title)}</h1><p class="muted">${esc(p.venues?.name)} · ${p.visibility==='open'?'Open':'Invite-only'}</p></div></div>
+    <h2>Going as</h2>
+    <div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm violet" id="pl" aria-label="One more friend">+</button></div></div>
+    <p class="small muted">Bring up to 4 friends.</p>
+    <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
+    ${mine?'<button class="btn" id="lv">Not going anymore</button>':''}
+    ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
+  </div>`;
+  document.getElementById('bk').onclick=()=>openVenue(p.venue_id);
+  document.getElementById('mi').onclick=()=>{ friends=Math.max(0,friends-1); document.getElementById('gl').textContent=label(); };
+  document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
+  document.getElementById('go').onclick=async()=>{ const { error } = await SB.from('plan_members').upsert({ plan_id:pid, user_id:S.user.id, friends }); if(error) return toast(error.message); toast("You're going"); openPlan(pid); };
+  const lv=document.getElementById('lv'); if(lv) lv.onclick=async()=>{ await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); openPlan(pid); };
+  const cp=document.getElementById('cp'); if(cp) cp.onclick=async()=>{ const link=location.origin+location.pathname+'#join='+p.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } };
+}
+async function renderPlans(){
+  const { data:mine } = await SB.from('plan_members').select('friends, plans(id,title,starts_at,visibility,venues(name))').eq('user_id',S.user.id);
+  const list=(mine||[]).filter(m=>m.plans && new Date(m.plans.starts_at) > Date.now()-6*36e5).sort((a,b)=>new Date(a.plans.starts_at)-new Date(b.plans.starts_at));
+  $app.innerHTML = `<div class="screen">
+    <div class="row between"><h1>My plans</h1><button class="btn gold sm" id="np">+ New plan</button></div>
+    <div class="list">${list.length? list.map(m=>{const p=m.plans,w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${esc(p.venues?.name)} · ${m.friends?'you + '+m.friends:'just you'}</p></div></button>`}).join('') : '<p class="muted">No plans yet. Pick a spot on the map, or start one.</p>'}</div>
+    <div class="card"><p style="font-weight:600;color:var(--violet)">Founding Member</p><p class="small muted">You joined before launch.</p></div>
+  </div>`;
+  document.getElementById('np').onclick=()=>newPlan(null);
+  document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+}
+
+// ---------- chats ----------
+async function renderChats(){
+  const { data:cons } = await SB.rpc('my_chats');
+  $app.innerHTML = `<div class="screen"><h1>Chats</h1>
+    <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
+      return `<button class="item" data-id="${c.id}"><div class="avatar">${initials(c.other_name)}</div><div style="flex:1"><p style="font-weight:600">${esc(c.other_name)}</p>
+      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Kept by both of you':mineKept?'You kept it · waiting on them':'Disappears in '+hrs+'h'}</p></div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here for 14 hours. Tap Keep to save it.</p>'}</div></div>`;
+  document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
+}
+async function openChat(cid){
+  const { data:msgs } = await SB.from('messages').select('*').eq('connection_id',cid).order('created_at');
+  $app.innerHTML = `<div class="screen">
+    <div class="row between"><button class="back" id="bk">‹ Chats</button><button class="btn sm gold" id="kp">Keep</button></div>
+    <div id="msgs" style="display:flex;flex-direction:column;gap:8px">${(msgs||[]).map(m=>`<div class="bubble ${m.sender===S.user.id?'me':''}">${esc(m.body)}</div>`).join('')||'<p class="small muted">Say something nice. Then go say it in person.</p>'}</div>
+    <div class="row"><input type="text" id="tx" maxlength="1000" placeholder="Message"><button class="btn sm violet" id="sd">Send</button></div>
+    <button class="btn" id="bl" style="color:var(--red)">Block or report</button>
+  </div>`;
+  document.getElementById('bk').onclick=()=>setTab('chats');
+  document.getElementById('kp').onclick=async()=>{ await SB.rpc('keep_connection',{ cid }); toast('Kept. It stays if they keep it too.'); };
+  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; const { error } = await SB.from('messages').insert({ connection_id:cid, sender:S.user.id, body }); if(error) return toast(error.message); tx.value=''; openChat(cid); };
+  document.getElementById('sd').onclick=send; document.getElementById('tx').onkeydown=e=>{ if(e.key==='Enter') send(); };
+  document.getElementById('bl').onclick=async()=>{
+    const { data:c } = await SB.from('connections').select('user_a,user_b').eq('id',cid).single(); const other = c.user_a===S.user.id?c.user_b:c.user_a;
+    const reason = prompt('Tell us what happened (optional). They will be blocked either way.') ;
+    if(reason===null) return;
+    await SB.from('blocks').insert({ blocker:S.user.id, blocked:other });
+    await SB.from('reports').insert({ reporter:S.user.id, reported:other, reason:'chat', details:reason||null });
+    toast('Blocked. Thanks for telling us.'); setTab('chats');
+  };
+}
+
+// ---------- me / living room ----------
+function renderMe(){
+  const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
+  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual;
+  $app.innerHTML = `<div class="screen">
+    <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
+    <div class="card row"><div class="avatar" style="width:64px;height:64px">${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="">`:initials(p.first_name)}</div><div><p style="font-size:18px;font-weight:600">${esc(p.first_name)}</p><p class="small muted">Photo from your sign-in</p></div></div>
+    <h2>I'm looking for</h2>
+    <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
+    <h2>Tap what you're into</h2>
+    <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="${!!picked[i]}">${esc(i)}</button>`).join('')}</div>
+    <h2>Who I am & what I'm open to</h2>
+    <label class="f">Orientation (optional)<input type="text" id="or" maxlength="40" value="${esc(p.orientation||'')}" placeholder="Self-describe"></label>
+    <label class="f">Relationship style (optional)<input type="text" id="rs" maxlength="40" value="${esc(p.relationship_style||'')}" placeholder="Monogamous, open, …"></label>
+    <div class="row" style="gap:8px"><label class="f" style="flex:1">Ages from<input type="number" id="amin" min="18" max="99" value="${p.show_age_min}"></label><label class="f" style="flex:1">to<input type="number" id="amax" min="18" max="99" value="${p.show_age_max}"></label></div>
+    <div class="card row between"><div><p style="font-weight:600">Open to something casual</p><p class="small muted">Only members who also turned this on will see it</p></div><button class="switch" id="cs" role="switch" aria-checked="${casual}" aria-label="Open to something casual"></button></div>
+    <h2>Privacy</h2>
+    <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">You're hidden until you check in, either way. Off lets members inside your spot find you right away.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
+    <button class="btn gold" id="sv">Save</button>
+    <button class="btn" id="so">Sign out</button>
+    <p class="small muted" style="text-align:center">MIRL test version · Questions: hello@gomirl.com</p>
+  </div>`;
+  document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
+  document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); };
+  document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
+  document.getElementById('sv').onclick=async()=>{
+    const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
+    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:document.getElementById('or').value.trim()||null, relationship_style:document.getElementById('rs').value.trim()||null, show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost };
+    const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
+    if(error) return toast(error.message); toast('Saved'); loadProfile();
+  };
+  document.getElementById('so').onclick=async()=>{ await SB.auth.signOut(); S.user=null; S.profile=null; render(); };
+}
+
+// ---------- invite links ----------
+async function handleJoin(){
+  const m=location.hash.match(/join=([a-f0-9]+)/); if(!m||!S.user||!S.profile) return;
+  history.replaceState(null,'',location.pathname);
+  const { data, error } = await SB.rpc('join_plan_by_code',{ code:m[1], bring:0 });
+  if(error) return toast('That invite link is not valid');
+  toast("You're in"); openPlan(data);
+}
+boot().then(handleJoin);
+</script>
+</body>
+</html>
