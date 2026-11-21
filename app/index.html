@@ -6,6 +6,13 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#12101C">
 <title>MIRL</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MIRL">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
@@ -153,7 +160,7 @@ function renderWelcome(){
     <button class="btn white" id="g">Continue with Google</button>
     <button class="btn" id="f">Continue with Facebook</button>
     <p class="small muted" style="text-align:center">18+ only. Nobody sees you unless you're inside the same spot.</p>
-    <p class="small muted" style="text-align:center">Early test version for Founding Members.</p>
+    <p class="small muted" style="text-align:center">Early test version for Founding Members. <a href="/privacy/">Privacy</a></p>
   </div>`;
   const go = provider => SB.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin + location.pathname } });
   document.getElementById('g').onclick = ()=>go('google');
@@ -422,7 +429,9 @@ function renderMe(needHandle){
     <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">You're hidden until you check in, either way. Off lets members inside your spot find you right away.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
     <button class="btn gold" id="sv">Save</button>
     <button class="btn" id="so">Sign out</button>
-    <p class="small muted" style="text-align:center">MIRL test version · Questions: hello@gomirl.com</p>
+    ${window.matchMedia('(display-mode: standalone)').matches||navigator.standalone?'':'<div class="card"><p style="font-weight:600">Put MIRL on your home screen</p><p class="small muted">iPhone: tap Share, then Add to Home Screen. Android: tap the ⋮ menu, then Add to Home screen.</p></div>'}
+    <p class="small muted" style="text-align:center">MIRL test version · <a href="/privacy/">Privacy</a> · hello@gomirl.com</p>
+    <button class="btn" id="del" style="color:var(--red);border-color:transparent;min-height:40px">Delete my account</button>
   </div>`;
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
@@ -438,6 +447,10 @@ function renderMe(needHandle){
     if(error) return toast(error.message); toast('Saved'); loadProfile();
   };
   document.getElementById('so').onclick=async()=>{ await SB.auth.signOut(); S.user=null; S.profile=null; render(); };
+  document.getElementById('del').onclick=async()=>{
+    if(!confirm('Delete your MIRL account? Your profile, plans, chats and everything else will be permanently deleted. This cannot be undone.')) return;
+    const { error } = await SB.rpc('delete_my_account'); if(error) return toast('Could not delete: '+error.message);
+    await SB.auth.signOut(); S.user=null; S.profile=null; toast('Your account was deleted'); render(); };
 }
 
 // ---------- invite links ----------
