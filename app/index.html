@@ -396,17 +396,16 @@ async function drawDiscreet(){
       <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm ${L?'':'gold'}" id="dlk" style="width:auto">${L?'Change PIN':'Set PIN'}</button>${L?'<button class="back small" id="dlo" style="font-size:12px">Turn off</button>':''}</div></div>
     <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quiet notifications</p><p class="small muted">Alerts just say "New activity". No names, spots or messages.</p></div><button class="switch" id="dqn" role="switch" aria-checked="${quiet}" aria-label="Quiet notifications"></button></div>
     <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quick hide</p><p class="small muted">Double-tap the top of the screen to cover MIRL with a plain Notes page. Hold "Notes" for a second to come back.</p></div><button class="switch" id="dqh" role="switch" aria-checked="${qh}" aria-label="Quick hide"></button></div>
-    <div style="margin-top:14px"><p style="font-weight:600">Plain home-screen icon</p>
-      ${plain?`<p class="small muted">On. MIRL shows as <b>Hub</b> with a plain icon. If you still see the MIRL icon, delete it from your home screen, then in Safari tap Share, then Add to Home Screen.</p><button class="back small" id="dpo" style="font-size:12px">Switch back to the MIRL icon</button>`
-        :`<p class="small muted">Shows MIRL as <b>Hub</b> with a plain icon instead of the MIRL logo.</p><button class="btn sm" id="dpi" style="width:auto;margin-top:6px">Use the plain icon</button>`}</div>
+    <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Plain home-screen icon</p>
+      <p class="small muted">${plain?'On: MIRL shows as <b>Hub</b> with a plain icon. iPhone only updates the icon when you add it, so delete MIRL from your home screen, then in Safari tap Share → Add to Home Screen.':'Shows MIRL as <b>Hub</b> with a plain icon instead of the MIRL logo.'}</p></div>
+      <button class="switch" id="dpt" role="switch" aria-checked="${plain}" aria-label="Plain home-screen icon"></button></div>
     <p class="small muted" style="margin-top:14px">More tips: keep Ghost Mode on, use a cartoon avatar instead of a photo, and sign in with a Google account only you use.</p>`;
   document.getElementById('dlk').onclick=()=>setPin(drawDiscreet);
   document.getElementById('dlo')?.addEventListener('click',()=>{ const a=pinPad('Enter your PIN','To turn off app lock.', async(p,api)=>{ const L=getLock(); if(await sha(L.salt+p)!==L.hash) return api.fail('Wrong PIN'); lsSet('mirl_lock',null); api.close(); toast('App lock is off'); drawDiscreet(); }, true); });
   document.getElementById('dqn').onclick=async e=>{ const v=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',v);
     const n=Object.assign({}, S.profile.notify||{}, { quiet:v }); S.profile.notify=n; await SB.from('profiles').update({ notify:n }).eq('id',S.user.id); };
   document.getElementById('dqh').onclick=e=>{ const v=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',v); lsSet('mirl_qhide',v?'1':null); if(v) toast('Quick hide is on. Double-tap the top of the screen.'); };
-  document.getElementById('dpi')?.addEventListener('click',()=>{ lsSet('mirl_plain','1'); location.replace('/app/?plain=1#me'); });
-  document.getElementById('dpo')?.addEventListener('click',()=>{ lsSet('mirl_plain',null); location.replace('/app/#me'); });
+  document.getElementById('dpt').onclick=()=>{ if(plain){ lsSet('mirl_plain',null); location.replace('/app/#me'); } else { lsSet('mirl_plain','1'); location.replace('/app/?plain=1#me'); } };
 }
 // ---------- photos: private bucket, approved by MIRL, shown only after a mutual hi ----------
 const ADMIN_ID='7c5636fb-c2f9-4b05-98f1-84f85daf990d';
