@@ -88,10 +88,10 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     <div>
       <div class="eyebrow">Coming to Atlantic Ave in 2027</div>
       <h1>Meet in real life.</h1>
-      <p class="lede">Find out where people who like what you like are going Thursday night, or start your own plan and see who joins.</p>
+      <p class="lede">Find out where people who like what you like are going tonight, or start your own plan and see who joins.</p>
       <div class="how">
         <div><b>1</b><p>Tell us what you're into<small>A 30-second tap quiz. Dating, friends, or open to both.</small></p></div>
-        <div><b>2</b><p>See who's going Thursday<small>Every spot on the Avenue is already on the map. Join a plan or post your own, open or invite-only. Go solo or bring up to 4 friends.</small></p></div>
+        <div><b>2</b><p>See where people are going<small>Every spot on the Avenue is already on the map. Join a plan or post your own, open or invite-only. Go solo or bring up to 4 friends.</small></p></div>
         <div><b>3</b><p>Walk in and say hi<small>Once you're inside, you see who else is there. Checking in is one tap.</small></p></div>
       </div>
     </div>
@@ -165,7 +165,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     var btn=document.getElementById('go'); btn.disabled=true; btn.textContent='Saving...';
     fetch(URL,{method:'POST',mode:'no-cors',body:d}).then(function(){
       var safe=fn.replace(/[<>&"]/g,'');
-      f.innerHTML='<div class="done"><span class="badge" style="justify-content:center"><i></i>Founding Member</span><strong>You\'re on the list, '+safe+'.</strong><p>We\'ll email you before the first MIRL Night on Atlantic Ave.</p><p style="margin-top:6px">Want the first look? Follow along: <a href="https://www.instagram.com/mirl.app/" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Instagram @mirl.app</a> · <a href="https://www.facebook.com/profile.php?id=61596968152556" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Facebook</a></p></div>';
+      f.innerHTML='<div class="done"><span class="badge" style="justify-content:center"><i></i>Founding Member</span><strong>You\'re on the list, '+safe+'.</strong><p>We\'ll email you when MIRL opens on Atlantic Ave.</p><p style="margin-top:6px">Want the first look? Follow along: <a href="https://www.instagram.com/mirl.app/" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Instagram @mirl.app</a> · <a href="https://www.facebook.com/profile.php?id=61596968152556" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Facebook</a></p></div>';
     }).catch(function(){btn.disabled=false;btn.textContent='Save my spot';err.textContent='That did not go through. Check your connection and try again.';});
   });
 })();
