@@ -99,21 +99,101 @@ function pickVal(id){ const s=document.getElementById(id+'s').value; return s===
 const ORIENTS=['Straight','Gay','Lesbian','Bisexual','Pansexual','Queer','Heteroflexible','Homoflexible','Asexual','Demisexual','Questioning'];
 const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🍉','🎲'];
 const COLORS=['#7B78FF','#DCD03A','#45BE85','#FF8A7A','#5EC8F2','#E58CFF'];
-function av(icon,color,size){ size=size||48; return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${esc(icon||'✨')}</div>`; }
+// ---------- avatar builder: stored in avatar_icon as "b" + 7 base36 digits ----------
+const AB={
+  skin:['#FFE0C7','#F8CBA6','#E9B48A','#D39A6A','#B57A4C','#8D5A36','#6B4026','#4A2C1A'],
+  hairC:['#1C1712','#4A2F1C','#7A4B2A','#D8B465','#B4482A','#B9B4AE','#FF7AC6','#5E8BFF'],
+  shirt:['#12101C','#F4F1FA','#DCD03A','#7B78FF','#45BE85','#FF8A7A','#5EC8F2','#E58CFF'],
+  parts:['skin','hair','hairC','eyes','mouth','extra','shirt'],
+  n:{skin:8,hair:10,hairC:8,eyes:6,mouth:6,extra:10,shirt:8},
+  label:{skin:'Skin',hair:'Hair',hairC:'Hair color',eyes:'Eyes',mouth:'Mouth',extra:'Extras',shirt:'Top'}
+};
+function abParse(code){ const o={}; AB.parts.forEach((k,i)=>{ const d=parseInt((code||'')[i+1]||'0',36); o[k]=(isNaN(d)?0:d)%AB.n[k]; }); return o; }
+function abCode(o){ return 'b'+AB.parts.map(k=>(o[k]||0).toString(36)).join(''); }
+function abRandom(){ const o={}; AB.parts.forEach(k=>o[k]=Math.floor(Math.random()*AB.n[k])); return o; }
+function abSvg(o){
+  const sk=AB.skin[o.skin], hc=AB.hairC[o.hairC], sh=AB.shirt[o.shirt], ink='#2A1E1A';
+  const cap='<path d="M29 44C28 24 39 17 50 17C62 17 72 24 71 44C67 33 59 29 50 29C41 29 33 33 29 44Z" fill="'+hc+'"/>';
+  const back=['','',
+    '<path d="M27 46C26 21 39 15 50 15C62 15 74 21 73 46L76 82L62 82L64 52L36 52L38 82L24 82Z" fill="'+hc+'"/>',
+    '<circle cx="50" cy="14" r="9" fill="'+hc+'"/>',
+    '<circle cx="50" cy="38" r="29" fill="'+hc+'"/><circle cx="27" cy="52" r="9" fill="'+hc+'"/><circle cx="73" cy="52" r="9" fill="'+hc+'"/>',
+    '','','<ellipse cx="76" cy="44" rx="7" ry="15" fill="'+hc+'"/>','',
+    '<path d="M27 46C26 21 39 15 50 15C62 15 74 21 73 46L74 64L62 64L64 50L36 50L38 64L26 64Z" fill="'+hc+'"/>'][o.hair];
+  const front=['',cap,cap,cap,cap,
+    '<path d="M29 46C27 22 40 16 52 17C64 18 73 26 71 44C64 34 50 32 38 30C34 34 31 39 29 46Z" fill="'+hc+'"/>',
+    '<path d="M44 30L46 8L54 8L56 30Z" fill="'+hc+'"/>',
+    cap,
+    '<path d="M30 40C31 24 40 19 50 19C61 19 70 24 70 40C65 31 58 28 50 28C42 28 35 31 30 40Z" fill="'+hc+'" opacity=".55"/>',
+    cap][o.hair];
+  const eyes=[
+    '<circle cx="42" cy="47" r="2.6" fill="'+ink+'"/><circle cx="58" cy="47" r="2.6" fill="'+ink+'"/>',
+    '<path d="M38 48Q42 43 46 48M54 48Q58 43 62 48" stroke="'+ink+'" stroke-width="2.4" fill="none" stroke-linecap="round"/>',
+    '<circle cx="42" cy="47" r="2.6" fill="'+ink+'"/><path d="M54 47.5Q58 45 62 47.5" stroke="'+ink+'" stroke-width="2.4" fill="none" stroke-linecap="round"/>',
+    '<circle cx="42" cy="47" r="4.2" fill="#fff"/><circle cx="58" cy="47" r="4.2" fill="#fff"/><circle cx="42.6" cy="47.6" r="2.4" fill="'+ink+'"/><circle cx="58.6" cy="47.6" r="2.4" fill="'+ink+'"/>',
+    '<path d="M38 48L46 48M54 48L62 48" stroke="'+ink+'" stroke-width="2.4" stroke-linecap="round"/>',
+    '<circle cx="42" cy="47" r="2.6" fill="'+ink+'"/><circle cx="58" cy="47" r="2.6" fill="'+ink+'"/><path d="M38 44L40 45.5M62 44L60 45.5M39.5 43L41 44.8M60.5 43L59 44.8" stroke="'+ink+'" stroke-width="1.6" stroke-linecap="round"/>'][o.eyes];
+  const mouth=[
+    '<path d="M43 57Q50 63 57 57" stroke="'+ink+'" stroke-width="2.4" fill="none" stroke-linecap="round"/>',
+    '<path d="M42 56Q50 66 58 56Z" fill="'+ink+'"/><path d="M44 57.5Q50 60 56 57.5" stroke="#fff" stroke-width="2" fill="none"/>',
+    '<path d="M44 59L56 59" stroke="'+ink+'" stroke-width="2.4" stroke-linecap="round"/>',
+    '<path d="M44 59Q52 61 57 56" stroke="'+ink+'" stroke-width="2.4" fill="none" stroke-linecap="round"/>',
+    '<ellipse cx="50" cy="59" rx="3.2" ry="3.8" fill="'+ink+'"/>',
+    '<path d="M43 57Q50 63 57 57" stroke="'+ink+'" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 60Q50 66 53 60Z" fill="#FF6F86"/>'][o.mouth];
+  const extra=['',
+    '<g stroke="'+ink+'" stroke-width="2" fill="none"><circle cx="42" cy="47" r="6.5"/><circle cx="58" cy="47" r="6.5"/><path d="M48.5 47L51.5 47"/></g>',
+    '<g fill="#14121C" stroke="#14121C" stroke-width="2"><rect x="34" y="42" width="14" height="10" rx="4"/><rect x="52" y="42" width="14" height="10" rx="4"/><path d="M48 46L52 46"/></g>',
+    '<path d="M27 37C27 20 38 14 50 14C62 14 73 20 73 37Z" fill="'+sh+'" stroke="#0004"/><path d="M50 37L86 37C86 41 80 42 70 41Z" fill="'+sh+'" stroke="#0004"/>',
+    '<path d="M27 40C26 20 38 12 50 12C62 12 74 20 73 40Z" fill="'+sh+'"/><rect x="26" y="34" width="48" height="8" rx="4" fill="'+sh+'" stroke="#0003"/><circle cx="50" cy="11" r="5" fill="'+sh+'"/>',
+    '<circle cx="30" cy="57" r="2.6" fill="#DCD03A"/><circle cx="70" cy="57" r="2.6" fill="#DCD03A"/>',
+    '<g fill="#8A4A2A" opacity=".55"><circle cx="38" cy="53" r="1"/><circle cx="41" cy="55" r="1"/><circle cx="36" cy="56" r="1"/><circle cx="62" cy="53" r="1"/><circle cx="59" cy="55" r="1"/><circle cx="64" cy="56" r="1"/></g>',
+    '<path d="M30 50C31 64 39 72 50 72C61 72 69 64 70 50C66 58 60 62 50 62C40 62 34 58 30 50Z" fill="'+hc+'"/>',
+    '<path d="M41 55Q50 50 59 55Q55 57 50 55Q45 57 41 55Z" fill="'+hc+'"/>',
+    '<circle cx="36" cy="55" r="4" fill="#FF7A9A" opacity=".45"/><circle cx="64" cy="55" r="4" fill="#FF7A9A" opacity=".45"/>'][o.extra];
+  return '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">'+back+
+    '<path d="M16 102C18 82 33 75 50 75C67 75 82 82 84 102Z" fill="'+sh+'"/>'+
+    '<rect x="43" y="62" width="14" height="16" rx="5" fill="'+sk+'"/><rect x="43" y="64" width="14" height="5" fill="#0002"/>'+
+    '<circle cx="30" cy="49" r="5" fill="'+sk+'"/><circle cx="70" cy="49" r="5" fill="'+sk+'"/>'+
+    '<ellipse cx="50" cy="47" rx="20" ry="23" fill="'+sk+'"/>'+front+eyes+mouth+extra+'</svg>';
+}
+const isBuilt=i=>/^b[0-9a-z]{7}$/.test(i||'');
+function av(icon,color,size){ size=size||48; const inner=isBuilt(icon)?abSvg(abParse(icon)):esc(icon||'✨'); return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${inner}</div>`; }
 const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
     <h2>How you show up in the room</h2>
     <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
     <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."><span class="small" id="hdmsg">Lowercase letters, numbers, _ or . (3–20)</span></label></div>
-    <div class="chips" id="icons">${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
+    <div class="seg" id="avmode" style="margin:10px 0"><button data-v="e" aria-pressed="${!isBuilt(icon)}">Emoji</button><button data-v="b" aria-pressed="${isBuilt(icon)}">Build my own</button></div>
+    <div class="chips" id="icons" ${isBuilt(icon)?'hidden':''}>${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
+    <div id="builder" ${isBuilt(icon)?'':'hidden'}></div>
+    <p class="small muted" style="margin-top:6px">Background color</p>
     <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>`; }
 function wireId(st){
   const hd=document.getElementById('hd'), hm=document.getElementById('hdmsg'); let tmr;
   hd.oninput=()=>{ const c=hd.value.toLowerCase().replace(/[^a-z0-9_.]/g,''); if(c!==hd.value){ hd.value=c; hm.textContent='Only lowercase letters, numbers, _ or . allowed'; hm.style.color='var(--gold)'; }
     clearTimeout(tmr); tmr=setTimeout(async()=>{ if(!HANDLE_RE.test(hd.value)){ hm.textContent='3–20 characters'; hm.style.color='var(--muted)'; return; }
       const { data } = await SB.rpc('handle_available',{ h:hd.value }); hm.textContent = data===false?'Taken. Try another.':'@'+hd.value+' is yours if you save'; hm.style.color = data===false?'var(--red)':'var(--green)'; },400); };
-  document.querySelectorAll('#icons .chip').forEach(b=>b.onclick=()=>{ st.icon=b.textContent; document.querySelectorAll('#icons .chip').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
-  document.querySelectorAll('#colors .chip').forEach(b=>b.onclick=()=>{ st.color=b.dataset.c; document.querySelectorAll('#colors .chip').forEach(x=>{ const on=x===b; x.setAttribute('aria-pressed',on); x.style.borderColor=on?'var(--ink)':x.dataset.c; x.style.borderWidth=on?'3px':'1px'; }); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
+  const prev=()=>document.getElementById('avp').innerHTML=av(st.icon,st.color,64);
+  let bo=isBuilt(st.icon)?abParse(st.icon):abRandom(), lastEmoji=isBuilt(st.icon)?ICONS[1]:st.icon;
+  const bwrap=document.getElementById('builder');
+  const drawB=()=>{
+    bwrap.innerHTML = AB.parts.map(k=>`<p class="small muted" style="margin:10px 0 4px">${AB.label[k]}</p><div class="chips">${
+      Array.from({length:AB.n[k]},(_,v)=>{ const on=bo[k]===v; const t=Object.assign({},bo,{[k]:v});
+        const sw = k==='skin'?AB.skin[v] : k==='hairC'?AB.hairC[v] : k==='shirt'?AB.shirt[v] : null;
+        return sw ? `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AB.label[k]} ${v+1}" style="width:38px;background:${sw};border-color:${on?'var(--gold)':'var(--line)'};border-width:${on?3:1}px"></button>`
+                  : `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AB.label[k]} ${v+1}" style="padding:2px;background:${on?'var(--gold)':'transparent'}">${av(abCode(t),st.color,40)}</button>`; }).join('')
+    }</div>`).join('') + '<button class="btn sm" id="abshuf" style="margin-top:12px">🎲 Shuffle</button>';
+    bwrap.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{ bo[b.dataset.k]=+b.dataset.v; st.icon=abCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); });
+    document.getElementById('abshuf').onclick=()=>{ bo=abRandom(); st.icon=abCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); };
+  };
+  if(isBuilt(st.icon)) drawB();
+  document.querySelectorAll('#avmode button').forEach(b=>b.onclick=()=>{ const built=b.dataset.v==='b';
+    document.querySelectorAll('#avmode button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+    document.getElementById('icons').hidden=built; bwrap.hidden=!built;
+    if(built){ if(!isBuilt(st.icon)) lastEmoji=st.icon; st.icon=abCode(bo); drawB(); } else st.icon=lastEmoji;
+    prev(); });
+  document.querySelectorAll('#icons .chip').forEach(b=>b.onclick=()=>{ st.icon=b.textContent; lastEmoji=st.icon; document.querySelectorAll('#icons .chip').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
+  document.querySelectorAll('#colors .chip').forEach(b=>b.onclick=()=>{ st.color=b.dataset.c; document.querySelectorAll('#colors .chip').forEach(x=>{ const on=x===b; x.setAttribute('aria-pressed',on); x.style.borderColor=on?'var(--ink)':x.dataset.c; x.style.borderWidth=on?'3px':'1px'; }); prev(); if(!bwrap.hidden){ const y=window.scrollY; drawB(); window.scrollTo(0,y); } });
 }
 async function checkHandle(){ const h=document.getElementById('hd').value.trim().toLowerCase().replace(/^@/,'');
   if(!HANDLE_RE.test(h)) return { err:'Handle: 3–20 letters, numbers, _ or .' };
