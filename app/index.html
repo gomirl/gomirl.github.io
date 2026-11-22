@@ -344,7 +344,45 @@ function setTab(t){ S.tab=t; document.querySelectorAll('nav.tabs button').forEac
 document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 
 // ---------- boot ----------
+// ---------- phone notifications (web push) ----------
+const NKINDS=[['hot','🔥 Spots heating up near you'],['friends','👥 Friends going out'],['chats','💬 Hi\'s back, messages, chats fading'],['plans','📅 Plans starting soon'],['photos','✅ Photo approvals']];
+const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent), IS_STANDALONE=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const swReady=()=>Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null),4000))]);
+const b64u=x=>{ const r=atob((x+'='.repeat((4-x.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(r,c=>c.charCodeAt(0)); };
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/app/sw.js',{ scope:'/app/' }).catch(()=>{});
+async function pushOn(){
+  try{ const perm=await Notification.requestPermission(); if(perm!=='granted'){ drawNotify(); return; }
+    const { data:key } = await SB.rpc('push_public_key'); if(!key) throw new Error('Notifications are not ready yet. Try again in a minute.');
+    const reg=await swReady(); if(!reg) throw new Error('Could not start notifications. Close MIRL, open it again, and retry.');
+    let sub=await reg.pushManager.getSubscription(); if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64u(key) });
+    const j=sub.toJSON(); const { error } = await SB.rpc('save_push_sub',{ p_endpoint:j.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth }); if(error) throw error;
+    toast('Notifications on'); SB.rpc('push_test'); drawNotify();
+  }catch(e){ toast(e.message||'Could not turn on notifications'); }
+}
+async function drawNotify(){
+  const box=document.getElementById('ntf'); if(!box) return;
+  const can='serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if(!can){ box.innerHTML = IS_IOS&&!IS_STANDALONE
+      ? '<p style="font-weight:600">Add MIRL to your home screen first</p><p class="small muted">On iPhone, notifications only work from the home-screen app. Tap Share, then Add to Home Screen, then open MIRL from that icon.</p>'
+      : '<p class="small muted">This browser can\'t show notifications. Try Chrome or Safari.</p>'; return; }
+  let sub=null; try{ const reg=await swReady(); if(reg) sub=await reg.pushManager.getSubscription(); }catch{}
+  if(!document.body.contains(box)) return;
+  const on=!!sub && Notification.permission==='granted', pref=S.profile.notify||{};
+  if(on){ const j=sub.toJSON(); SB.rpc('save_push_sub',{ p_endpoint:j.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth }); }
+  box.innerHTML = on
+    ? `<div class="row between"><p style="font-weight:600">Notifications on</p><button class="btn sm" id="ntest" style="width:auto">Send a test</button></div>
+       ${NKINDS.map(([k,l])=>`<div class="row between" style="margin-top:10px"><p class="small">${l}</p><button class="switch" data-nk="${k}" role="switch" aria-checked="${pref[k]!==false}" aria-label="${esc(l)}"></button></div>`).join('')}
+       <button class="back small" id="noff" style="margin-top:12px">Turn off on this phone</button>`
+    : `<p style="font-weight:600">Get a heads-up when a spot near you heats up</p><p class="small muted" style="margin:4px 0 10px">Also when someone says hi back, a friend goes out, or your plan is about to start. At most 2 "heating up" alerts a night, 6 PM to 1 AM.</p>`
+      + (Notification.permission==='denied' ? '<p class="small" style="color:var(--gold)">Notifications are blocked for MIRL in your phone settings. Turn them on there, then come back.</p>' : '<button class="btn gold" id="non">Turn on notifications</button>');
+  document.getElementById('non')?.addEventListener('click', pushOn);
+  document.getElementById('ntest')?.addEventListener('click', async()=>{ await SB.rpc('push_test'); toast('Test sent. It should pop up in a few seconds.'); });
+  document.getElementById('noff')?.addEventListener('click', async()=>{ try{ await SB.rpc('drop_push_sub',{ p_endpoint:sub.endpoint }); await sub.unsubscribe(); }catch{} toast('Notifications off on this phone'); drawNotify(); });
+  box.querySelectorAll('[data-nk]').forEach(b=>b.onclick=async()=>{ const v=b.getAttribute('aria-checked')!=='true'; b.setAttribute('aria-checked',v);
+    const n=Object.assign({}, S.profile.notify||{}, { [b.dataset.nk]:v }); S.profile.notify=n; await SB.from('profiles').update({ notify:n }).eq('id',S.user.id); });
+}
 async function boot(){
+  { const h=location.hash.slice(1); if(['map','plans','chats','me'].includes(h)){ S.tab=h; document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current', b.dataset.tab===h?'page':'false')); history.replaceState(null,'',location.pathname+location.search); } }
   await Promise.race([AVA_P, new Promise(r=>setTimeout(r,4000))]);
   const { data:{ session } } = await SB.auth.getSession();
   S.user = session?.user || null;
@@ -794,6 +832,8 @@ function renderMe(needHandle){
       <p class="small muted" style="margin-bottom:10px">Never shown in the room or on the map. Only when you both say hi and you're both open to casual, your chat shows what you have in common. Nothing else.</p>
       <div class="chips" id="dchips">${DESIRES.map(i=>`<button class="chip" aria-pressed="${!!dpick[i]}">${esc(i)}</button>`).join('')}</div>
     </div>
+    <h2>Notifications</h2>
+    <div class="card" id="ntf"></div>
     <h2>Privacy</h2>
     <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">On: your friends can't see where you are. Off: your spot counts toward "friends here" on their map. A small number can still hint it's you, so leave it on if you'd rather not be found. Strangers never see you unless they're inside the same spot, either way.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
     <div class="card row between"><div><p style="font-weight:600">Count me in area activity</p><p class="small muted">While MIRL is open, you add to the purple glow on the map. It only uses a rough area about 3 blocks wide, never your name, disappears after an hour, and only shows when 3 or more people are around.</p></div><button class="switch" id="as" role="switch" aria-checked="${act}" aria-label="Count me in area activity"></button></div>
@@ -806,7 +846,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
   wireId(ist);
-  drawMyPhotos(); drawReview();
+  drawMyPhotos(); drawReview(); drawNotify();
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
