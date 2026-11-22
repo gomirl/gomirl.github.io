@@ -59,6 +59,7 @@ nav.tabs button[aria-current=page]{color:var(--gold);font-weight:600}
 nav.tabs svg{width:22px;height:22px}
 #map{height:46vh;min-height:300px;border-radius:22px;overflow:hidden;border:1px solid var(--line)}
 .leaflet-container{background:#1A1727;font-family:var(--body)}
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9) saturate(.6)}
 .pin{background:var(--surface2);color:var(--ink);border:1px solid #3A3452;border-radius:14px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .pin.hot{background:var(--gold);color:var(--bg);border-color:var(--gold)}
 .pin.warm{background:var(--violet);color:var(--bg);border-color:var(--violet)}
@@ -235,7 +236,16 @@ async function fillAvatarPhotos(){
     const urls=await signedUrls([...new Set(Object.values(map))]);
     els.forEach(e=>{ const u=urls[map[e.dataset.ap]]; if(u) e.innerHTML=`<img src="${esc(u)}" alt="" style="width:100%;height:100%;object-fit:cover">`; });
   }catch{} apBusy=false; if(document.querySelector('[data-ap]:not([data-apdone])')) fillAvatarPhotos(); }
-new MutationObserver(()=>{ clearTimeout(window.__apT); window.__apT=setTimeout(fillAvatarPhotos,60); }).observe(document.getElementById('app'),{ childList:true, subtree:true });
+let vbBusy=false;
+async function fillBadges(){
+  if(vbBusy||!S.user) return; const els=[...document.querySelectorAll('[data-vb]:not([data-vbdone])')]; if(!els.length) return; vbBusy=true;
+  try{ els.forEach(e=>e.dataset.vbdone='1'); const on=new Set();
+    const uids=[...new Set(els.filter(e=>e.dataset.vb.startsWith('u:')).map(e=>e.dataset.vb.slice(2)))];
+    if(uids.length){ const { data } = await SB.rpc('member_badges',{ uids }); (data||[]).forEach(r=>on.add('u:'+r.id)); }
+    if(els.some(e=>e.dataset.vb.startsWith('c:'))){ const { data } = await SB.rpc('chat_badges'); (data||[]).forEach(r=>on.add('c:'+r.cid)); }
+    els.forEach(e=>{ if(on.has(e.dataset.vb)){ e.textContent=' ✓'; e.title='Verified'; e.style.cssText='color:var(--green);font-weight:700'; } });
+  }catch{} vbBusy=false; if(document.querySelector('[data-vb]:not([data-vbdone])')) fillBadges(); }
+new MutationObserver(()=>{ clearTimeout(window.__apT); window.__apT=setTimeout(()=>{ fillAvatarPhotos(); fillBadges(); },60); }).observe(document.getElementById('app'),{ childList:true, subtree:true });
 const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
     <h2>How you show up in the room</h2>
@@ -350,13 +360,42 @@ async function uploadPhoto(f){
     toast('Sent to MIRL for approval'); drawMyPhotos(); markReview();
   }catch(e){ toast(e.message||'Upload failed. Try again.'); }
 }
+async function drawVerifyQueue(){
+  const box=document.getElementById('admv'); if(!box) return;
+  const { data } = await SB.rpc('pending_verifications'); const list=data||[];
+  const urls=await signedUrls([...new Set(list.flatMap(r=>[r.path].concat(r.photos||[])))]); if(!document.body.contains(box)) return;
+  box.innerHTML = `<h2>Selfie checks (${list.length})</h2>` + (list.length ? list.map(r=>`<div class="card"><p class="small" style="margin-bottom:6px"><b>@${esc(r.handle)}</b> was asked: ${esc(r.pose)}</p>
+    <div class="row" style="gap:8px;align-items:flex-start;flex-wrap:wrap"><div style="width:48%"><p class="small muted">Selfie</p><img src="${esc(urls[r.path]||'')}" alt="" style="width:100%;border-radius:10px;background:#000"></div>
+    <div style="width:48%"><p class="small muted">Their photos</p>${(r.photos||[]).map(x=>`<img src="${esc(urls[x]||'')}" alt="" style="width:48%;border-radius:8px;margin:0 2% 4px 0">`).join('')||'<p class="small muted">None yet</p>'}</div></div>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn sm gold" data-vok="${r.id}">Verify ✓</button><button class="btn sm" data-vno="${r.id}" style="color:var(--red)">Doesn't match</button></div></div>`).join('') : '<p class="small muted">Nothing waiting.</p>');
+  box.querySelectorAll('[data-vok],[data-vno]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.vok; const { error } = await SB.rpc('review_verification',{ vid:b.dataset.vok||b.dataset.vno, ok }); if(error) return toast(error.message); toast(ok?'Verified':'Rejected'); drawVerifyQueue(); markReview(); });
+}
+async function drawVerify(){
+  const box=document.getElementById('vfy'); if(!box) return;
+  const { data:st } = await SB.rpc('my_verification'); if(!document.body.contains(box)) return;
+  if(st==='verified'){ box.innerHTML='<p style="font-weight:600;color:var(--green)">✓ You\'re verified</p><p class="small muted">People see a ✓ next to your handle.</p>'; return; }
+  if(st==='pending'){ box.innerHTML='<p style="font-weight:600">Under review</p><p class="small muted">MIRL is comparing your selfie with your photos. We\'ll let you know.</p>'; return; }
+  const { data:ok } = await SB.from('photos').select('id').eq('status','approved'); if(!document.body.contains(box)) return;
+  if(!(ok||[]).length){ box.innerHTML='<p style="font-weight:600">Get a ✓ next to your handle</p><p class="small muted">Add a photo above and get it approved first, so we have something to compare your selfie with.</p>'; return; }
+  const POSES=['👍 Thumbs up next to your face','✌️ Peace sign by your cheek','✋ Hand flat on top of your head','👉 Point at your ear','🤙 Call-me hand by your cheek','👌 OK sign under your chin','🤞 Fingers crossed next to your face'];
+  const pose=POSES[Math.floor(Math.random()*POSES.length)];
+  box.innerHTML=`${st==='rejected'?'<p class="small" style="color:var(--gold);margin-bottom:6px">Your last selfie didn\'t pass. Try again with your face clear and the pose showing.</p>':''}<p style="font-weight:600">Get a ✓ next to your handle</p>
+    <p class="small muted" style="margin:4px 0 10px">Take a quick selfie doing this pose. Only MIRL sees it.</p><p style="font-size:20px;margin-bottom:10px">${esc(pose)}</p><button class="btn gold" id="vgo">Take selfie</button>`;
+  const inp=document.getElementById('vff');
+  document.getElementById('vgo').onclick=()=>{ inp.onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    try{ toast('Sending…'); const b=await shrinkPhoto(f); const path=S.user.id+'/verify-'+(crypto.randomUUID?crypto.randomUUID():Date.now())+'.jpg';
+      const up=await SB.storage.from('photos').upload(path,b,{ contentType:'image/jpeg' }); if(up.error) throw up.error;
+      const { error } = await SB.rpc('submit_verification',{ p_path:path, p_pose:pose }); if(error){ await SB.storage.from('photos').remove([path]); throw error; }
+      toast('Sent. We\'ll review it soon.'); drawVerify(); }catch(err){ toast(err.message||'Could not send. Try again.'); } }; inp.click(); };
+}
 async function drawReview(){
+  drawVerifyQueue();
   const box=document.getElementById('adm'); if(!box) return;
   const { data } = await SB.rpc('pending_photos'); const list=data||[]; const urls=await signedUrls(list.map(r=>r.path)); if(!document.body.contains(box)) return;
   box.innerHTML = `<h2>Photos to approve (${list.length})</h2>` + (list.length ? list.map(r=>`<div class="card"><p class="small muted" style="margin-bottom:6px">@${esc(r.handle)}</p><img src="${esc(urls[r.path]||'')}" alt="" style="width:100%;max-height:360px;object-fit:contain;border-radius:12px;background:#000"><div class="row" style="gap:8px;margin-top:10px"><button class="btn sm gold" data-ok="${r.id}">Approve</button><button class="btn sm" data-no="${r.id}" style="color:var(--red)">Reject</button></div></div>`).join('') : '<p class="small muted">Nothing waiting.</p>');
   box.querySelectorAll('[data-ok],[data-no]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.ok; const { error } = await SB.rpc('review_photo',{ pid:b.dataset.ok||b.dataset.no, ok }); if(error) return toast(error.message); toast(ok?'Approved':'Rejected'); drawReview(); markReview(); });
 }
-async function markReview(){ if(S.user?.id!==ADMIN_ID) return; const { data } = await SB.rpc('pending_photos'); const n=(data||[]).length;
+async function markReview(){ if(S.user?.id!==ADMIN_ID) return; const [{ data }, { data:vq }] = await Promise.all([SB.rpc('pending_photos'), SB.rpc('pending_verifications')]); const n=(data||[]).length+(vq||[]).length;
   const t=document.querySelector('nav.tabs button[data-tab=me]'); if(!t) return; let d=t.querySelector('.dot'); if(!d){ d=document.createElement('span'); d.className='dot'; d.style.cssText='position:absolute;margin-left:28px;margin-top:-4px;background:var(--red);color:#fff;border-radius:9px;font-size:11px;min-width:18px;height:18px;line-height:18px;padding:0 4px'; t.style.position='relative'; t.prepend(d); }
   d.textContent=n; d.hidden=!n; }
 const $app = document.getElementById('app');
@@ -512,7 +551,7 @@ async function renderMap(){
   </div>`;
   const el=document.getElementById('map');
   S.map = L.map(el,{zoomControl:false,attributionControl:true}).setView(view?[view.lat,view.lng]:DELRAY, view?.z||16);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(S.map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(S.map);
   const glow=L.layerGroup().addTo(S.map), layer=L.layerGroup().addTo(S.map);
   S.osmCache = S.osmCache || {};
   let tmr, seq=0;
@@ -681,7 +720,7 @@ async function openInside(vid, name, lat, lng){
     <div class="row between"><h2>Here now · best matches first</h2><span class="small muted">Visible only inside</span></div>
     <div class="list" id="ppl">${error?'<p class="err">'+esc(error.message)+'</p>':(people||[]).length? people.map(p=>`<div class="item" style="cursor:default">
       ${av(p.avatar_icon,p.avatar_color,null,'u:'+p.id)}
-      <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(p.handle)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
+      <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(p.handle)}<span data-vb="u:${p.id}"></span>, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
       <p class="small muted">${p.shared_interests?p.shared_interests+' shared interest'+(p.shared_interests>1?'s':''):''}</p></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${p.id}">Say hi</button><button class="back small" data-rep="${p.id}" style="font-size:12px">Report</button></div></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
     <p class="small muted">"Open to casual" only shows when you both turned it on.</p>
@@ -704,7 +743,8 @@ function newPlan(vid, vname){
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Back</button>
     <h1>Start a plan</h1>
-    ${vid?`<p class="muted">at ${esc(vname)}</p>`:`<label class="f">Where<select id="ven">${(S.venues||[]).map((v,i)=>v.is_public===false?'':`<option value="${i}">${esc(v.name)}</option>`).join('')||'<option value="">Open the map first to pick a spot</option>'}</select></label>`}
+    ${vid?`<p class="muted">at ${esc(vname)}</p>`:`<label class="f">Where<input type="text" id="vq" autocomplete="off" placeholder="Start typing a bar, restaurant, park…"></label>
+      <div class="list" id="vsug" style="gap:6px;margin-top:-6px"></div><p class="small" id="vpick" style="color:var(--green)"></p>`}
     <label class="f">What<input type="text" id="ti" maxlength="80" placeholder="Salsa night, beginners welcome"></label>
     <label class="f">When<input type="datetime-local" id="wh" value="${local}"></label>
     <div class="seg" style="grid-template-columns:1fr 1fr" id="vis"><button aria-pressed="true" data-v="open">Open to members</button><button aria-pressed="false" data-v="invite">Invite-only</button></div>
@@ -714,12 +754,34 @@ function newPlan(vid, vname){
     <p class="small muted">Public venues only. Hosts follow the same 18+, block and report rules.</p>
   </div>`;
   document.getElementById('bk').onclick=()=> vid?openVenue(vid):setTab('plans');
+  let picked=null;
+  if(!vid){
+    let view=null; try{ view=JSON.parse(localStorage.getItem('mirl_view')||'null'); }catch{}
+    const lat=view?.lat||26.4616, lng=view?.lng||-80.0685;
+    const vq=document.getElementById('vq'), sug=document.getElementById('vsug'), vp=document.getElementById('vpick'); let tmr, seq=0;
+    const show=items=>{ sug.innerHTML=items.map((v,i)=>`<button class="item" data-i="${i}" style="padding:10px 12px"><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(v.name)}</p><p class="small muted">${esc([v.category,v.address].filter(Boolean).join(' · ')||'')}</p></div>${v.venue_id?'<span class="small" style="color:var(--violet)">On MIRL</span>':''}</button>`).join('');
+      sug.querySelectorAll('.item').forEach(b=>b.onclick=()=>{ picked=items[+b.dataset.i]; vq.value=picked.name; sug.innerHTML=''; vp.textContent='📍 '+picked.name+(picked.address?' · '+picked.address:''); }); };
+    const nearby=(S.venues||[]).filter(v=>v.is_public!==false).slice(0,5); if(nearby.length) show(nearby);
+    vq.oninput=()=>{ picked=null; vp.textContent=''; clearTimeout(tmr); const q=vq.value.trim(); if(q.length<2){ show(nearby); return; }
+      tmr=setTimeout(async()=>{ const my=++seq;
+        const [loc, osm] = await Promise.all([
+          SB.rpc('search_venues',{ q, p_lat:lat, p_lng:lng }).then(r=>(r.data||[]).map(v=>({ venue_id:v.id, osm_id:v.osm_id, name:v.name, category:v.category, address:v.address, lat:v.lat, lng:v.lng }))).catch(()=>[]),
+          q.length<3 ? Promise.resolve([]) : fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${lat}&lon=${lng}&limit=8&lang=en`).then(r=>r.json()).then(j=>(j.features||[])
+            .filter(f=>f.properties.name && /^(amenity|leisure|tourism|shop|club|sport)$/.test(f.properties.osm_key))
+            .map(f=>({ venue_id:null, osm_id:String(f.properties.osm_type||'n').toLowerCase()[0]+f.properties.osm_id, name:f.properties.name, category:(f.properties.osm_value||'').replace(/_/g,' '),
+               address:[[f.properties.housenumber,f.properties.street].filter(Boolean).join(' '), f.properties.city].filter(Boolean).join(', ')||null, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0] }))).catch(()=>[])
+        ]);
+        if(my!==seq) return;
+        const have=new Set(loc.map(v=>v.osm_id).filter(Boolean)), out=loc.concat(osm.filter(o=>!have.has(o.osm_id) && !loc.some(l=>l.name.toLowerCase()===o.name.toLowerCase() && Math.abs(l.lat-o.lat)<0.001 && Math.abs(l.lng-o.lng)<0.001))).slice(0,8);
+        if(!out.length){ sug.innerHTML='<p class="small muted">No matches yet. Keep typing, or add the spot from the map.</p>'; return; }
+        show(out); },300); };
+  }
   document.querySelectorAll('#vis button').forEach(b=>b.onclick=()=>{ vis=b.dataset.v; document.querySelectorAll('#vis button').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('vnote').textContent = vis==='open'?'Shows on the map to members who fit your settings.':'Only people you send the link to can see and join.'; });
   document.getElementById('go').onclick=async()=>{
     const err=document.getElementById('err'); const title=document.getElementById('ti').value.trim();
     if(title.length<3) return err.textContent='Give it a short name.';
     let venue_id = vid;
-    if(!venue_id){ const sel=S.venues?.[+document.getElementById('ven').value]; if(!sel) return err.textContent='Pick a spot.';
+    if(!venue_id){ const sel=picked; if(!sel) return err.textContent='Start typing the spot, then tap it in the list.';
       if(!sel.venue_id){ const { data:id, error:e2 } = await SB.rpc('save_osm_venue',{ p_osm:sel.osm_id, p_name:sel.name, p_cat:sel.category||null, p_addr:sel.address||null, p_lat:sel.lat, p_lng:sel.lng }); if(e2) return err.textContent='Could not use that spot.'; sel.venue_id=id; }
       venue_id=sel.venue_id; }
     const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis }).select('id,invite_code').single();
@@ -749,7 +811,7 @@ async function openPlan(pid){
     <h2>Who's going</h2>
     ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
       : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color,null,'u:'+g.id)}
-        <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
+        <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}<span data-vb="u:${g.id}"></span>, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
         <p class="small muted">${g.shared_interests?g.shared_interests+' shared interest'+(g.shared_interests>1?'s':''):''}</p></div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${g.id}">Say hi</button><button class="back small" data-rep="${g.id}" style="font-size:12px">Report</button></div></div>`).join('')}</div>
         <p class="small muted">If you both say hi, a chat opens before you get there.</p>`
@@ -784,10 +846,27 @@ async function renderPlans(){
 async function renderChats(){
   const { data:cons } = await SB.rpc('my_chats');
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
+    <div class="card"><p style="font-weight:600">Add a friend by handle</p>
+      <div class="row" style="gap:8px;margin-top:8px"><input type="text" id="fh" placeholder="@handle" maxlength="21" autocapitalize="none" autocomplete="off" style="flex:1"><button class="btn sm gold" id="fsend" style="width:auto">Send</button></div>
+      <p class="small muted" id="fmsg" style="margin-top:6px">Ask them for their exact handle. You're friends once they accept. Yours is <b style="color:var(--ink)">@${esc(S.profile.handle||'')}</b>.</p></div>
+    <div id="freqs"></div>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
-      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
+      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span><span data-vb="c:${c.id}"></span></p>
       <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h if quiet · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here. It stays open as long as you keep talking, and disappears after 14 quiet hours unless you both tap Add friend.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
+  const send=async()=>{ const h=document.getElementById('fh').value.trim().replace(/^@/,'').toLowerCase(); const m=document.getElementById('fmsg');
+    if(!HANDLE_RE.test(h)) { m.textContent='Handles are 3–20 letters, numbers, _ or .'; m.style.color='var(--gold)'; return; }
+    if(h===S.profile.handle){ m.textContent="That's you!"; return; }
+    const { data, error } = await SB.rpc('friend_request',{ h }); if(error){ m.textContent=error.message; m.style.color='var(--red)'; return; }
+    document.getElementById('fh').value='';
+    if(data==='friends'){ toast("You're friends now"); renderChats(); return; }
+    m.style.color='var(--green)'; m.textContent=`Sent. If @${h} is on MIRL, they'll see your request.`; };
+  document.getElementById('fsend').onclick=send; document.getElementById('fh').onkeydown=e=>{ if(e.key==='Enter') send(); };
+  const { data:reqs } = await SB.rpc('my_friend_requests'); const fr=document.getElementById('freqs'); if(!fr) return;
+  fr.innerHTML=(reqs||[]).length?`<h2>Friend requests</h2><div class="list">${reqs.map(r=>`<div class="item" style="cursor:default">${av(r.avatar_icon,r.avatar_color,null,'u:'+r.from_id)}<div style="flex:1"><p style="font-weight:600">@${esc(r.handle)}<span data-vb="u:${r.from_id}"></span></p><p class="small muted">wants to be friends</p></div>
+    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm gold" data-acc="${r.from_id}" style="width:auto">Accept</button><button class="back small" data-dec="${r.from_id}" style="font-size:12px">Decline</button></div></div>`).join('')}</div>`:'';
+  fr.querySelectorAll('[data-acc],[data-dec]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.acc; const { data:cid, error } = await SB.rpc('answer_friend_request',{ sender:b.dataset.acc||b.dataset.dec, ok });
+    if(error) return toast(error.message); if(ok&&cid){ toast("You're friends now"); openChat(cid); } else renderChats(); });
 }
 async function openChat(cid){
   const { data:msgs } = await SB.from('messages').select('*').eq('connection_id',cid).order('created_at');
@@ -842,7 +921,10 @@ function renderMe(needHandle){
     <p class="small muted" style="margin-bottom:10px">Optional, up to 4. MIRL checks every photo before anyone sees it. Approved photos show only inside a chat, after you both said hi, unless you pick one as your avatar. Must be you. No nudity.</p>
     <div id="ph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
     <input type="file" id="phf" accept="image/*" hidden>
-    ${S.user.id===ADMIN_ID?'<div id="adm"></div>':''}
+    <h2>Get verified</h2>
+    <div class="card" id="vfy"></div>
+    <input type="file" id="vff" accept="image/*" capture="user" hidden>
+    ${S.user.id===ADMIN_ID?'<div id="adm"></div><div id="admv"></div>':''}
     <h2>I'm looking for</h2>
     <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
     <h2>Tap what you're into</h2>
@@ -871,7 +953,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
   wireId(ist);
-  drawMyPhotos(); drawReview(); drawNotify();
+  drawMyPhotos(); drawReview(); drawNotify(); drawVerify();
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
@@ -887,7 +969,7 @@ function renderMe(needHandle){
   document.getElementById('so').onclick=async()=>{ await SB.auth.signOut(); S.user=null; S.profile=null; render(); };
   document.getElementById('del').onclick=async()=>{
     if(!confirm('Delete your MIRL account? Your profile, plans, chats and everything else will be permanently deleted. This cannot be undone.')) return;
-    const { data:mine } = await SB.from('photos').select('path'); if((mine||[]).length) await SB.storage.from('photos').remove(mine.map(r=>r.path));
+    try{ const { data:files } = await SB.storage.from('photos').list(S.user.id,{ limit:100 }); if((files||[]).length) await SB.storage.from('photos').remove(files.map(f=>S.user.id+'/'+f.name)); }catch{}
     const { error } = await SB.rpc('delete_my_account'); if(error) return toast('Could not delete: '+error.message);
     await SB.auth.signOut(); S.user=null; S.profile=null; toast('Your account was deleted'); render(); };
 }
