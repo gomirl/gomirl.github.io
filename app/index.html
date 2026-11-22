@@ -177,15 +177,53 @@ function abSvg(o,vb){
     '<ellipse cx="50" cy="47" rx="20" ry="23" fill="'+sk+'"/>'+front+brows+eyes+nose+mouth+extra+'</svg>';
 }
 const isBuilt=i=>/^b[0-9a-z]{7,9}$/.test(i||'');
-function av(icon,color,size){ size=size||48; const inner=isBuilt(icon)?abSvg(abParse(icon)):esc(icon||'✨'); return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${inner}</div>`; }
+// ---------- Avataaars (DiceBear, art by Pablo Stanley, free for commercial use). Stored as "a" + 11 base36 digits ----------
+window.AVA=null;
+const AVA_P=Promise.all([import('https://cdn.jsdelivr.net/npm/@dicebear/core@9.2.2/+esm'),import('https://cdn.jsdelivr.net/npm/@dicebear/avataaars@9.2.2/+esm')])
+  .then(([c,st])=>{ window.AVA={ core:c, style:st }; }).catch(()=>{});
+const AV={
+  skin:['ffdbb4','edb98a','d08b5b','ae5d29','8d5524','614335','3b2219'],
+  hair:['2c1b18','4a312c','724133','a55728','b58143','d6b370','c93305','e8e1e1','f59797','5e8bff'],
+  cloth:['262e33','ffffff','dcd03a','7b78ff','45be85','ff8a7a','5ec8f2','e58cff','929598','b1e2ff'],
+  top:['hat','hijab','turban','winterHat1','winterHat02','winterHat03','winterHat04','bob','bun','curly','curvy','dreads','frida','fro','froBand','longButNotTooLong','miaWallace','shavedSides','straight02','straight01','straightAndStrand','dreads01','dreads02','frizzle','shaggy','shaggyMullet','shortCurly','shortFlat','shortRound','shortWaved','sides','theCaesar','theCaesarAndSidePart','bigHair'],
+  brows:['defaultNatural','flatNatural','raisedExcitedNatural','upDownNatural','angryNatural','frownNatural','sadConcernedNatural','unibrowNatural','default','raisedExcited','upDown','angry','sadConcerned'],
+  eyes:['default','happy','wink','side','squint','hearts','surprised','closed','eyeRoll','winkWacky','cry','xDizzy'],
+  mouth:['smile','default','twinkle','serious','tongue','concerned','disbelief','eating','grimace','sad','screamOpen'],
+  acc:['prescription01','prescription02','round','kurt','wayfarers','sunglasses','eyepatch'],
+  beard:['beardLight','beardMedium','beardMajestic','moustacheFancy','moustacheMagnum'],
+  clothing:['shirtCrewNeck','shirtScoopNeck','shirtVNeck','hoodie','graphicShirt','collarAndSweater','blazerAndShirt','blazerAndSweater','overall'],
+  parts:['skin','top','hairC','hatC','brows','eyes','mouth','acc','beard','clothing','clothC'],
+  order:['skin','top','hairC','hatC','brows','eyes','mouth','beard','acc','clothing','clothC'],
+  n:{skin:7,top:35,hairC:10,hatC:10,brows:13,eyes:12,mouth:11,acc:8,beard:6,clothing:9,clothC:10},
+  label:{skin:'Skin',top:'Hair or headwear',hairC:'Hair color',hatC:'Hat / scarf color',brows:'Eyebrows',eyes:'Eyes',mouth:'Mouth',acc:'Glasses',beard:'Facial hair',clothing:'Top',clothC:'Top color'},
+  face:{brows:1,eyes:1,mouth:1,beard:1,acc:1},
+  sw:{skin:'skin',hairC:'hair',hatC:'cloth',clothC:'cloth'}
+};
+const isAva=i=>/^a[0-9a-z]{11}$/.test(i||'');
+function avParse(code){ const o={}; AV.parts.forEach((k,i)=>{ const d=parseInt((code||'')[i+1]||'0',36); o[k]=(isNaN(d)?0:d)%AV.n[k]; }); return o; }
+function avCode(o){ return 'a'+AV.parts.map(k=>(o[k]||0).toString(36)).join(''); }
+function avRandom(){ const r=n=>Math.floor(Math.random()*n), pick=a=>a[r(a.length)];
+  return { skin:r(7), top:8+r(27), hairC:r(10), hatC:r(10), brows:pick([0,1,2,8]), eyes:pick([0,1,2,3,4]), mouth:pick([0,1,2]), acc:Math.random()<.25?1+r(5):0, beard:Math.random()<.2?1+r(5):0, clothing:r(9), clothC:r(10) }; }
+const AV_CACHE={};
+function avUri(code){ if(!window.AVA) return ''; if(AV_CACHE[code]) return AV_CACHE[code]; const o=avParse(code);
+  try{ AV_CACHE[code]=window.AVA.core.createAvatar(window.AVA.style,{ seed:'mirl',
+    skinColor:[AV.skin[o.skin]], top:[AV.top[Math.max(0,o.top-1)]], topProbability:o.top?100:0,
+    hairColor:[AV.hair[o.hairC]], hatColor:[AV.cloth[o.hatC]], eyebrows:[AV.brows[o.brows]], eyes:[AV.eyes[o.eyes]], mouth:[AV.mouth[o.mouth]],
+    accessories:[AV.acc[Math.max(0,o.acc-1)]], accessoriesProbability:o.acc?100:0, accessoriesColor:['262e33'],
+    facialHair:[AV.beard[Math.max(0,o.beard-1)]], facialHairProbability:o.beard?100:0, facialHairColor:[AV.hair[o.hairC]],
+    clothing:[AV.clothing[o.clothing]], clothesColor:[AV.cloth[o.clothC]], clothingGraphic:['pizza'] }).toDataUri(); }catch(e){ return ''; }
+  return AV_CACHE[code]; }
+const avImg=(code,face)=>{ const u=avUri(code); return u?`<img src="${u}" alt="" style="width:100%;height:100%;${face?'transform:scale(2) translateY(6%)':'transform:translateY(4%)'}">`:''; };
+const isCustom=i=>isBuilt(i)||isAva(i);
+function av(icon,color,size){ size=size||48; const inner=isAva(icon)?avImg(icon):isBuilt(icon)?abSvg(abParse(icon)):esc(icon||'✨'); return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${inner}</div>`; }
 const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
     <h2>How you show up in the room</h2>
     <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
     <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."><span class="small" id="hdmsg">Lowercase letters, numbers, _ or . (3–20)</span></label></div>
-    <div class="seg" id="avmode" style="margin:10px 0"><button data-v="e" aria-pressed="${!isBuilt(icon)}">Emoji</button><button data-v="b" aria-pressed="${isBuilt(icon)}">Build my own</button></div>
-    <div class="chips" id="icons" ${isBuilt(icon)?'hidden':''}>${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
-    <div id="builder" ${isBuilt(icon)?'':'hidden'}></div>
+    <div class="seg" id="avmode" style="margin:10px 0"><button data-v="e" aria-pressed="${!isCustom(icon)}">Emoji</button><button data-v="b" aria-pressed="${isCustom(icon)}">Build my own</button></div>
+    <div class="chips" id="icons" ${isCustom(icon)?'hidden':''}>${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
+    <div id="builder" ${isCustom(icon)?'':'hidden'}></div>
     <p class="small muted" style="margin-top:6px">Background color</p>
     <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>`; }
 function wireId(st){
@@ -194,23 +232,25 @@ function wireId(st){
     clearTimeout(tmr); tmr=setTimeout(async()=>{ if(!HANDLE_RE.test(hd.value)){ hm.textContent='3–20 characters'; hm.style.color='var(--muted)'; return; }
       const { data } = await SB.rpc('handle_available',{ h:hd.value }); hm.textContent = data===false?'Taken. Try another.':'@'+hd.value+' is yours if you save'; hm.style.color = data===false?'var(--red)':'var(--green)'; },400); };
   const prev=()=>document.getElementById('avp').innerHTML=av(st.icon,st.color,64);
-  let bo=isBuilt(st.icon)?abParse(st.icon):Object.assign(abRandom(),{extra:0}), lastEmoji=isBuilt(st.icon)?ICONS[1]:st.icon;
+  let bo=isAva(st.icon)?avParse(st.icon):avRandom(), lastEmoji=isCustom(st.icon)?ICONS[1]:st.icon;
   const bwrap=document.getElementById('builder');
+  const hatTop=()=>bo.top>=1&&bo.top<=7;
   const drawB=()=>{
-    bwrap.innerHTML = AB.order.map(k=>`<p class="small muted" style="margin:10px 0 4px">${AB.label[k]}</p><div class="chips">${
-      Array.from({length:AB.n[k]},(_,v)=>{ const on=bo[k]===v; const t=Object.assign({},bo,{[k]:v}); if(k!=='extra') t.extra=0;
-        const sw = k==='skin'?AB.skin[v] : k==='hairC'?AB.hairC[v] : k==='shirt'?AB.shirt[v] : null;
-        return sw ? `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AB.label[k]} ${v+1}" style="width:38px;background:${sw};border-color:${on?'var(--gold)':'var(--line)'};border-width:${on?3:1}px"></button>`
-                  : `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AB.label[k]} ${v+1}" style="padding:3px;background:${on?'var(--gold)':'transparent'}"><div class="avatar" style="width:54px;height:54px;background:${esc(st.color)}">${abSvg(t, AB.face[k]?'30 30 40 40':'14 4 72 72')}</div></button>`; }).join('')
-    }</div>`).join('') + '<button class="btn sm" id="abshuf" style="margin-top:12px">🎲 Shuffle</button>';
-    bwrap.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{ bo[b.dataset.k]=+b.dataset.v; st.icon=abCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); });
-    document.getElementById('abshuf').onclick=()=>{ bo=abRandom(); st.icon=abCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); };
+    if(!window.AVA){ bwrap.innerHTML='<p class="small muted">Loading the avatar maker…</p>'; AVA_P.then(()=>{ if(window.AVA&&!bwrap.hidden){ if(isCustom(st.icon)) { st.icon=avCode(bo); prev(); } drawB(); } }); return; }
+    bwrap.innerHTML = AV.order.filter(k=>k!=='hatC'||hatTop()).map(k=>`<p class="small muted" style="margin:12px 0 4px">${AV.label[k]}</p><div class="chips">${
+      Array.from({length:AV.n[k]},(_,v)=>{ const on=bo[k]===v;
+        if(AV.sw[k]){ const c='#'+AV[AV.sw[k]][v]; return `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AV.label[k]} ${v+1}" style="width:38px;background:${c};border-color:${on?'var(--gold)':'var(--line)'};border-width:${on?3:1}px"></button>`; }
+        const t=Object.assign({},bo,{[k]:v}); if(AV.face[k]&&k!=='acc') t.acc=0;
+        return `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AV.label[k]} ${v+1}" style="padding:3px;background:${on?'var(--gold)':'transparent'}"><div class="avatar" style="width:56px;height:56px;background:${esc(st.color)}">${(k==='top'||k==='acc'||k==='beard')&&v===0?'<span style="font-size:12px;color:var(--bg)">None</span>':avImg(avCode(t),AV.face[k])}</div></button>`; }).join('')
+    }</div>`).join('') + '<button class="btn sm" id="abshuf" style="margin-top:12px">🎲 Shuffle</button><p class="small muted" style="margin-top:6px">Avatar art: Avataaars by Pablo Stanley</p>';
+    bwrap.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{ bo[b.dataset.k]=+b.dataset.v; st.icon=avCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); });
+    document.getElementById('abshuf').onclick=()=>{ bo=avRandom(); st.icon=avCode(bo); prev(); const y=window.scrollY; drawB(); window.scrollTo(0,y); };
   };
-  if(isBuilt(st.icon)) drawB();
+  if(isCustom(st.icon)) drawB();
   document.querySelectorAll('#avmode button').forEach(b=>b.onclick=()=>{ const built=b.dataset.v==='b';
     document.querySelectorAll('#avmode button').forEach(x=>x.setAttribute('aria-pressed',x===b));
     document.getElementById('icons').hidden=built; bwrap.hidden=!built;
-    if(built){ if(!isBuilt(st.icon)) lastEmoji=st.icon; st.icon=abCode(bo); drawB(); } else st.icon=lastEmoji;
+    if(built){ if(!isCustom(st.icon)) lastEmoji=st.icon; st.icon=avCode(bo); drawB(); } else st.icon=lastEmoji;
     prev(); });
   document.querySelectorAll('#icons .chip').forEach(b=>b.onclick=()=>{ st.icon=b.textContent; lastEmoji=st.icon; document.querySelectorAll('#icons .chip').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('avp').innerHTML=av(st.icon,st.color,64); });
   document.querySelectorAll('#colors .chip').forEach(b=>b.onclick=()=>{ st.color=b.dataset.c; document.querySelectorAll('#colors .chip').forEach(x=>{ const on=x===b; x.setAttribute('aria-pressed',on); x.style.borderColor=on?'var(--ink)':x.dataset.c; x.style.borderWidth=on?'3px':'1px'; }); prev(); if(!bwrap.hidden){ const y=window.scrollY; drawB(); window.scrollTo(0,y); } });
@@ -247,6 +287,7 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('clic
 
 // ---------- boot ----------
 async function boot(){
+  await Promise.race([AVA_P, new Promise(r=>setTimeout(r,4000))]);
   const { data:{ session } } = await SB.auth.getSession();
   S.user = session?.user || null;
   SB.auth.onAuthStateChange((_e, s)=>{ const was=S.user?.id; S.user=s?.user||null; if(was!==S.user?.id) loadProfile(); });
