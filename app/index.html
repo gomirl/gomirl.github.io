@@ -73,6 +73,16 @@ nav.tabs svg{width:22px;height:22px}
 .back{background:none;border:none;color:var(--muted);padding:0;cursor:pointer;font-size:14px;text-align:left}
 .bubble{max-width:80%;padding:10px 14px;border-radius:18px;background:var(--surface2);align-self:flex-start;line-height:1.35}
 .bubble.me{background:var(--violet);color:var(--bg);align-self:flex-end}
+.msg{display:flex;flex-direction:column;align-items:flex-start}
+.msg.me{align-items:flex-end}
+.msg .bubble{align-self:auto;cursor:pointer;-webkit-user-select:none;user-select:none}
+.quote{font-size:12px;color:var(--muted);border-left:3px solid var(--violet);padding:2px 8px;margin:0 4px 3px;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rx{display:flex;gap:4px;margin:-6px 6px 0;position:relative}
+.rx span{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0 6px;font-size:13px;line-height:22px}
+.rx span.mine{border-color:var(--gold)}
+.mbar{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:4px 8px;margin-top:6px}
+.mbar button{all:unset;cursor:pointer;font-size:22px;padding:2px 5px}
+.mbar button.rp{font-size:13px;font-weight:600;padding:4px 8px;border-left:1px solid var(--line);margin-left:4px}
 .hero{display:flex;flex-direction:column;gap:14px;padding-top:30px}
 .logo{font-family:var(--display);font-weight:700;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,#5E66FF,#8A2BFF);-webkit-background-clip:text;color:transparent}
 </style>
@@ -931,12 +941,21 @@ async function renderChats(){
   fr.querySelectorAll('[data-acc],[data-dec]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.acc; const { data:cid, error } = await SB.rpc('answer_friend_request',{ sender:b.dataset.acc||b.dataset.dec, ok });
     if(error) return toast(error.message); if(ok&&cid){ toast("You're friends now"); openChat(cid); } else renderChats(); });
 }
+const REACTS=['👍','👎','❤️','‼️'];
 async function openChat(cid){
-  const { data:msgs } = await SB.from('messages').select('*').eq('connection_id',cid).order('created_at');
+  const [{ data:msgs }, { data:rx }] = await Promise.all([SB.from('messages').select('*').eq('connection_id',cid).order('created_at'), SB.from('message_reactions').select('message_id,user_id,emoji').eq('connection_id',cid)]);
+  const M=new Map((msgs||[]).map(m=>[m.id,m])), R=new Map(); let replyTo=null;
+  (rx||[]).forEach(r=>{ if(!R.has(r.message_id)) R.set(r.message_id,new Map()); R.get(r.message_id).set(r.user_id,r.emoji); });
+  const snip=t=>(t||'').length>70?t.slice(0,70)+'…':(t||'');
+  const msgHTML=m=>{ const q=m.reply_to&&M.get(m.reply_to), rs=R.get(m.id), me=m.sender===S.user.id;
+    const counts={}; let mine=null; if(rs) rs.forEach((e,u)=>{ counts[e]=(counts[e]||0)+1; if(u===S.user.id) mine=e; });
+    return `<div class="msg ${me?'me':''}" data-id="${m.id}">${q?`<div class="quote">↩ ${q.sender===S.user.id?'You':'Them'}: ${esc(snip(q.body))}</div>`:''}<div class="bubble ${me?'me':''}">${esc(m.body)}</div>${Object.keys(counts).length?`<div class="rx">${REACTS.filter(e=>counts[e]).map(e=>`<span class="${mine===e?'mine':''}">${e}${counts[e]>1?' '+counts[e]:''}</span>`).join('')}</div>`:''}</div>`; };
   $app.innerHTML = `<div class="screen">
     <div class="row between"><button class="back" id="bk">‹ Chats</button><button class="btn sm gold" id="kp">Add friend</button></div>
     <div id="cph" class="row" style="gap:8px;overflow-x:auto" hidden></div>
-    <div id="msgs" style="display:flex;flex-direction:column;gap:8px">${(msgs||[]).map(m=>`<div class="bubble ${m.sender===S.user.id?'me':''}" data-id="${m.id}">${esc(m.body)}</div>`).join('')||'<p class="small muted" id="nomsg">Say something nice. Then go say it in person.</p>'}</div>
+    <div id="msgs" style="display:flex;flex-direction:column;gap:10px">${(msgs||[]).map(msgHTML).join('')||'<p class="small muted" id="nomsg">Say something nice. Then go say it in person.</p>'}</div>
+    <p class="small muted" style="text-align:center">Tap a message to react or reply</p>
+    <div id="rbar" class="row between" hidden style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 10px"><p class="small" id="rtext" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p><button class="back small" id="rx" aria-label="Cancel reply">✕</button></div>
     <div class="row"><input type="text" id="tx" maxlength="1000" placeholder="Message"><button class="btn sm violet" id="sd">Send</button></div>
     <button class="btn" id="bl" style="color:var(--red)">Block or report</button>
   </div>`;
@@ -954,11 +973,28 @@ async function openChat(cid){
     toast(data&&data.kept_a&&data.kept_b ? "You're friends now. This chat stays." : "Friend request sent. You'll be friends when they add you too."); };
   const box=document.getElementById('msgs');
   const addMsg=m=>{ if(!document.body.contains(box) || box.querySelector(`[data-id="${m.id}"]`)) return; document.getElementById('nomsg')?.remove();
-    const d=document.createElement('div'); d.className='bubble'+(m.sender===S.user.id?' me':''); d.dataset.id=m.id; d.textContent=m.body; box.appendChild(d); d.scrollIntoView({block:'end',behavior:'smooth'}); };
+    M.set(m.id,m); box.insertAdjacentHTML('beforeend', msgHTML(m)); box.lastElementChild.scrollIntoView({block:'end',behavior:'smooth'}); };
+  const redraw=id=>{ const el=box.querySelector(`.msg[data-id="${id}"]`), m=M.get(id); if(el&&m){ const open=!!el.querySelector('.mbar'); el.outerHTML=msgHTML(m); if(open) openBar(id); } };
+  const setReact=(id,u,e)=>{ if(!R.has(id)) R.set(id,new Map()); if(e) R.get(id).set(u,e); else R.get(id).delete(u); redraw(id); };
+  const openBar=id=>{ box.querySelectorAll('.mbar').forEach(x=>x.remove()); const el=box.querySelector(`.msg[data-id="${id}"]`); if(!el) return;
+    el.insertAdjacentHTML('beforeend', `<div class="mbar">${REACTS.map(e=>`<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('')}<button class="rp" data-reply="1">↩ Reply</button></div>`); };
+  box.onclick=async e=>{ const msgEl=e.target.closest('.msg'); if(!msgEl) return; const id=msgEl.dataset.id;
+    const rb=e.target.closest('[data-r]'), rp=e.target.closest('[data-reply]');
+    if(rp){ replyTo=id; document.getElementById('rtext').textContent='↩ Replying to: '+snip(M.get(id)?.body); document.getElementById('rbar').hidden=false; msgEl.querySelector('.mbar')?.remove(); document.getElementById('tx').focus(); return; }
+    if(rb){ const emo=rb.dataset.r, mine=R.get(id)?.get(S.user.id); msgEl.querySelector('.mbar')?.remove();
+      if(mine===emo){ setReact(id,S.user.id,null); const { error } = await SB.from('message_reactions').delete().eq('message_id',id).eq('user_id',S.user.id); if(error){ setReact(id,S.user.id,mine); toast(error.message); } }
+      else { setReact(id,S.user.id,emo); const { error } = await SB.from('message_reactions').upsert({ message_id:id, user_id:S.user.id, connection_id:cid, emoji:emo }); if(error){ setReact(id,S.user.id,mine||null); toast(error.message); } }
+      return; }
+    if(e.target.closest('.bubble')){ if(msgEl.querySelector('.mbar')) msgEl.querySelector('.mbar').remove(); else openBar(id); } };
+  document.getElementById('rx').onclick=()=>{ replyTo=null; document.getElementById('rbar').hidden=true; };
   box.lastElementChild?.scrollIntoView({block:'end'});
   if(S.chan) SB.removeChannel(S.chan);
-  S.chan = SB.channel('chat-'+cid).on('postgres_changes',{ event:'INSERT', schema:'public', table:'messages', filter:'connection_id=eq.'+cid }, p=>addMsg(p.new)).subscribe();
-  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; tx.value=''; const { data, error } = await SB.from('messages').insert({ connection_id:cid, sender:S.user.id, body }).select().single(); if(error){ tx.value=body; return toast(error.message); } addMsg(data); tx.focus(); };
+  S.chan = SB.channel('chat-'+cid)
+    .on('postgres_changes',{ event:'INSERT', schema:'public', table:'messages', filter:'connection_id=eq.'+cid }, p=>addMsg(p.new))
+    .on('postgres_changes',{ event:'*', schema:'public', table:'message_reactions', filter:'connection_id=eq.'+cid }, p=>{ const r=p.eventType==='DELETE'?p.old:p.new; if(!r||!r.message_id||r.user_id===S.user.id) return; setReact(r.message_id, r.user_id, p.eventType==='DELETE'?null:r.emoji); })
+    .subscribe();
+  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; tx.value=''; const rt=replyTo; replyTo=null; document.getElementById('rbar').hidden=true;
+    const { data, error } = await SB.from('messages').insert({ connection_id:cid, sender:S.user.id, body, reply_to:rt }).select().single(); if(error){ tx.value=body; return toast(error.message); } addMsg(data); tx.focus(); };
   document.getElementById('sd').onclick=send; document.getElementById('tx').onkeydown=e=>{ if(e.key==='Enter') send(); };
   document.getElementById('bl').onclick=async()=>{
     const { data:c } = await SB.from('connections').select('user_a,user_b').eq('id',cid).single(); const other = c.user_a===S.user.id?c.user_b:c.user_a;
