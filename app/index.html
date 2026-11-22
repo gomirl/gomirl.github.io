@@ -127,7 +127,7 @@ function pickField(id,label,opts,val){ const other = val && !opts.includes(val);
   <label class="f" id="${id}w" ${other?'':'hidden'}>In your words<input type="text" id="${id}" maxlength="40" value="${other?esc(val):''}"></label>`; }
 function pickVal(id){ const s=document.getElementById(id+'s').value; return s==='__o' ? (document.getElementById(id).value.trim()||null) : (s||null); }
 const ORIENTS=['Straight','Gay','Lesbian','Bisexual','Pansexual','Queer','Heteroflexible','Homoflexible','Asexual','Demisexual','Questioning'];
-const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🍉','🎲'];
+const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🍉','🫓','🎲'];
 const COLORS=['#7B78FF','#DCD03A','#45BE85','#FF8A7A','#5EC8F2','#E58CFF'];
 // ---------- avatar builder: stored in avatar_icon as "b" + 7 base36 digits ----------
 const AB={
