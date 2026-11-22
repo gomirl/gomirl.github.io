@@ -288,6 +288,15 @@ async function shareNight(name, lat, lng){
 const S = { user:null, profile:null, tab:'map', venues:[], map:null };
 // ---------- photos: private bucket, approved by MIRL, shown only after a mutual hi ----------
 const ADMIN_ID='7c5636fb-c2f9-4b05-98f1-84f85daf990d';
+// ---------- area activity: rough ~300 m block, no name, expires in 60 min, shown only when 3+ ----------
+let lastPing=0;
+function pingArea(pos){ if(!S.user||!S.profile||S.profile.share_activity===false||!pos) return; if(Date.now()-lastPing<4*60e3) return; lastPing=Date.now();
+  SB.rpc('ping_area',{ p_lat:pos.coords.latitude, p_lng:pos.coords.longitude }); }
+async function autoPing(){ try{ if(!S.profile||S.profile.share_activity===false||!navigator.geolocation||!navigator.permissions) return;
+  const st=await navigator.permissions.query({ name:'geolocation' }); if(st.state!=='granted') return;
+  navigator.geolocation.getCurrentPosition(pingArea, ()=>{}, { enableHighAccuracy:false, timeout:15000, maximumAge:300000 }); }catch{} }
+setInterval(()=>{ if(document.visibilityState==='visible') autoPing(); }, 10*60e3);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') autoPing(); });
 async function signedUrls(paths){ const m={}; if(!paths.length) return m;
   const { data } = await SB.storage.from('photos').createSignedUrls(paths, 3600); (data||[]).forEach(d=>{ if(d.signedUrl) m[d.path]=d.signedUrl; }); return m; }
 function shrinkPhoto(file, q){ return new Promise((res,rej)=>{ const img=new Image();
@@ -345,7 +354,7 @@ async function boot(){
 async function loadProfile(){
   if(!S.user){ S.profile=null; return render(); }
   const { data } = await SB.from('profiles').select('*').eq('id', S.user.id).maybeSingle();
-  S.profile = data; render(); markReview();
+  S.profile = data; render(); markReview(); autoPing();
 }
 function render(){
   if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
@@ -433,7 +442,7 @@ async function renderMap(){
       <div id="xhair" hidden style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid var(--gold);border-radius:50%;z-index:900;pointer-events:none;box-shadow:0 0 0 3px rgba(0,0,0,.4)"></div>
       <button class="btn sm" id="nearme" style="position:absolute;right:10px;bottom:10px;z-index:900;background:var(--surface);width:auto">📍 Near me</button>
     </div>
-    <p class="small muted" id="mapmsg">Numbers only. You see who's inside once you're there too, and only as avatars and handles.</p>
+    <p class="small muted" id="mapmsg">Numbers only. Purple glow = 3+ members around with the app open. You see who's inside a spot once you're there too, and only as avatars and handles.</p>
     <div id="addbox"></div>
     <button class="btn" id="addspot">+ Add a missing spot</button>
     <h2>Spots</h2><div class="list" id="vlist"><p class="small muted">Loading spots…</p></div>
@@ -441,7 +450,7 @@ async function renderMap(){
   const el=document.getElementById('map');
   S.map = L.map(el,{zoomControl:false,attributionControl:true}).setView(view?[view.lat,view.lng]:DELRAY, view?.z||16);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(S.map);
-  const layer=L.layerGroup().addTo(S.map);
+  const glow=L.layerGroup().addTo(S.map), layer=L.layerGroup().addTo(S.map);
   S.osmCache = S.osmCache || {};
   let tmr, seq=0;
   const load=async()=>{
@@ -450,8 +459,12 @@ async function renderMap(){
     const inDelray = Math.abs(c.lat-DELRAY[0])<0.03 && Math.abs(c.lng-DELRAY[1])<0.04;
     document.getElementById('area').textContent = inDelray ? 'Atlantic Ave · Delray Beach · launch zone' : 'Near you';
     const box={ s:b.getSouth(), w:b.getWest(), n:b.getNorth(), e:b.getEast() };
-    const [{ data:dbv }, { data:feat }, { data:fc }] = await Promise.all([SB.rpc('venue_counts_area',box), SB.rpc('featured_plan_area',box), SB.rpc('friend_counts')]);
+    const [{ data:dbv }, { data:feat }, { data:fc }, { data:act }] = await Promise.all([SB.rpc('venue_counts_area',box), SB.rpc('featured_plan_area',box), SB.rpc('friend_counts'), SB.rpc('area_activity',box)]);
     if(my!==seq) return;
+    glow.clearLayers();
+    (act||[]).forEach(a=>{ const n=a.people, lab=n>=20?'20+':n>=10?'10+':n>=5?'5+':'3+';
+      L.circle([a.lat,a.lng],{ radius:190, stroke:false, fillColor:'#7B78FF', fillOpacity:Math.min(.5,.16+n*.02), interactive:true })
+        .bindTooltip(lab+' members around', { direction:'top' }).addTo(glow); });
     const FC={}; (fc||[]).forEach(r=>FC[r.venue_id]=r.friends_here);
     let list=(dbv||[]).map(v=>({...v, friends_here:FC[v.venue_id]||0}));
     const sortL=l=>l.sort((a,b)=>(b.members_here||0)-(a.members_here||0) || (b.friends_here||0)-(a.friends_here||0) || a.name.localeCompare(b.name));
@@ -502,7 +515,7 @@ async function renderMap(){
   load();
   document.getElementById('nearme').onclick=()=>{
     if(!navigator.geolocation) return toast('Location is not available on this device.');
-    navigator.geolocation.getCurrentPosition(p=>S.map.setView([p.coords.latitude,p.coords.longitude],16), ()=>toast('Allow location to center the map. It stays on your phone.'), { timeout:10000 });
+    navigator.geolocation.getCurrentPosition(p=>{ pingArea(p); S.map.setView([p.coords.latitude,p.coords.longitude],16); }, ()=>toast('Allow location to center the map. It stays on your phone.'), { timeout:10000 });
   };
   // add a missing spot
   document.getElementById('addspot').onclick=()=>{
@@ -579,6 +592,7 @@ async function openVenue(id){
       else err.textContent='Could not get your location (weak signal indoors?). Step near a door or window and tap check in again.';
     };
     const go=async pos=>{
+      pingArea(pos);
       const d=dist(pos.coords.latitude,pos.coords.longitude,v.lat,v.lng);
       const acc=pos.coords.accuracy||0, allowed=Math.min(250, CHECKIN_RADIUS_M + Math.min(acc,150));
       if(d > allowed) return err.textContent = acc>150
@@ -755,7 +769,7 @@ async function openChat(cid){
 function renderMe(needHandle){
   const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
   const ist={ icon:p.avatar_icon||'✨', color:p.avatar_color||COLORS[0] };
-  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
+  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual, act=p.share_activity!==false; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
   $app.innerHTML = `<div class="screen">
     <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
     ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">New: pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
@@ -782,6 +796,7 @@ function renderMe(needHandle){
     </div>
     <h2>Privacy</h2>
     <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">On: your friends can't see where you are. Off: your spot counts toward "friends here" on their map. A small number can still hint it's you, so leave it on if you'd rather not be found. Strangers never see you unless they're inside the same spot, either way.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
+    <div class="card row between"><div><p style="font-weight:600">Count me in area activity</p><p class="small muted">While MIRL is open, you add to the purple glow on the map. It only uses a rough area about 3 blocks wide, never your name, disappears after an hour, and only shows when 3 or more people are around.</p></div><button class="switch" id="as" role="switch" aria-checked="${act}" aria-label="Count me in area activity"></button></div>
     <button class="btn gold" id="sv">Save</button>
     <button class="btn" id="so">Sign out</button>
     ${window.matchMedia('(display-mode: standalone)').matches||navigator.standalone?'':'<div class="card"><p style="font-weight:600">Put MIRL on your home screen</p><p class="small muted">iPhone: tap Share, then Add to Home Screen. Android: tap the ⋮ menu, then Add to Home screen.</p></div>'}
@@ -795,13 +810,14 @@ function renderMe(needHandle){
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
+  document.getElementById('as').onclick=e=>{ act=!act; e.currentTarget.setAttribute('aria-checked',act); };
   document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
   document.getElementById('sv').onclick=async()=>{
     const hc=await checkHandle(); if(hc.err){ const hm=document.getElementById('hdmsg'); hm.textContent=hc.err; hm.style.color='var(--red)'; document.getElementById('hd').scrollIntoView({block:'center'}); document.getElementById('hd').focus(); return; }
     const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
-    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color };
+    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, share_activity:act, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color };
     const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
-    if(error) return toast(error.message); toast('Saved'); loadProfile();
+    if(error) return toast(error.message); if(!act) SB.rpc('ping_area',{ p_lat:0, p_lng:0 }); toast('Saved'); loadProfile();
   };
   document.getElementById('so').onclick=async()=>{ await SB.auth.signOut(); S.user=null; S.profile=null; render(); };
   document.getElementById('del').onclick=async()=>{
