@@ -195,7 +195,7 @@ const AV={
   parts:['skin','top','hairC','hatC','brows','eyes','mouth','acc','beard','clothing','clothC'],
   order:['skin','top','hairC','hatC','brows','eyes','mouth','beard','acc','clothing','clothC'],
   n:{skin:7,top:35,hairC:10,hatC:10,brows:13,eyes:12,mouth:11,acc:8,beard:6,clothing:9,clothC:10},
-  label:{skin:'Skin',top:'Hair or headwear',hairC:'Hair color',hatC:'Hat / scarf color',brows:'Eyebrows',eyes:'Eyes',mouth:'Mouth',acc:'Glasses',beard:'Facial hair',clothing:'Top',clothC:'Top color'},
+  label:{skin:'Skin',top:'Hair',hairC:'Hair color',hatC:'Hat / scarf color',brows:'Eyebrows',eyes:'Eyes',mouth:'Mouth',acc:'Glasses',beard:'Facial hair',clothing:'Top',clothC:'Top color'},
   face:{brows:1,eyes:1,mouth:1,beard:1,acc:1},
   sw:{skin:'skin',hairC:'hair',hatC:'cloth',clothC:'cloth'}
 };
@@ -207,7 +207,7 @@ function avRandom(){ const r=n=>Math.floor(Math.random()*n), pick=a=>a[r(a.lengt
 const AV_CACHE={};
 function avUri(code){ if(!window.AVA) return ''; if(AV_CACHE[code]) return AV_CACHE[code]; const o=avParse(code);
   try{ AV_CACHE[code]=window.AVA.core.createAvatar(window.AVA.style,{ seed:'mirl',
-    skinColor:[AV.skin[o.skin]], top:[AV.top[Math.max(0,o.top-1)]], topProbability:o.top?100:0,
+    skinColor:[AV.skin[o.skin]], top:[AV.top[Math.max(0,o.top-1)]], topProbability:o.top>7?100:0,
     hairColor:[AV.hair[o.hairC]], hatColor:[AV.cloth[o.hatC]], eyebrows:[AV.brows[o.brows]], eyes:[AV.eyes[o.eyes]], mouth:[AV.mouth[o.mouth]],
     accessories:[AV.acc[Math.max(0,o.acc-1)]], accessoriesProbability:o.acc?100:0, accessoriesColor:['262e33'],
     facialHair:[AV.beard[Math.max(0,o.beard-1)]], facialHairProbability:o.beard?100:0, facialHairColor:[AV.hair[o.hairC]],
@@ -238,7 +238,7 @@ function wireId(st){
   const drawB=()=>{
     if(!window.AVA){ bwrap.innerHTML='<p class="small muted">Loading the avatar maker…</p>'; AVA_P.then(()=>{ if(window.AVA&&!bwrap.hidden){ if(isCustom(st.icon)) { st.icon=avCode(bo); prev(); } drawB(); } }); return; }
     bwrap.innerHTML = AV.order.filter(k=>k!=='hatC'||hatTop()).map(k=>`<p class="small muted" style="margin:12px 0 4px">${AV.label[k]}</p><div class="chips">${
-      Array.from({length:AV.n[k]},(_,v)=>{ const on=bo[k]===v;
+      Array.from({length:AV.n[k]},(_,v)=>{ if(k==='top'&&v>=1&&v<=7) return ''; const on=bo[k]===v;
         if(AV.sw[k]){ const c='#'+AV[AV.sw[k]][v]; return `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AV.label[k]} ${v+1}" style="width:38px;background:${c};border-color:${on?'var(--gold)':'var(--line)'};border-width:${on?3:1}px"></button>`; }
         const t=Object.assign({},bo,{[k]:v}); if(AV.face[k]&&k!=='acc') t.acc=0;
         return `<button class="chip" data-k="${k}" data-v="${v}" aria-pressed="${on}" aria-label="${AV.label[k]} ${v+1}" style="padding:3px;background:${on?'var(--gold)':'transparent'}"><div class="avatar" style="width:56px;height:56px;background:${esc(st.color)}">${(k==='top'||k==='acc'||k==='beard')&&v===0?'<span style="font-size:12px;color:var(--bg)">None</span>':avImg(avCode(t),AV.face[k])}</div></button>`; }).join('')
