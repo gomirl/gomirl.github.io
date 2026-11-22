@@ -120,6 +120,21 @@ async function checkHandle(){ const h=document.getElementById('hd').value.trim()
   const { data } = await SB.rpc('handle_available',{ h }); if(data===false) return { err:'That handle is taken. Try another.' };
   return { h }; }
 const CHECKIN_RADIUS_M = 120;
+async function reportPerson(id, where){
+  const why = prompt('Report this person? Tell us what happened (optional). They will also be blocked for you right away.');
+  if(why===null) return false;
+  await SB.from('blocks').insert({ blocker:S.user.id, blocked:id });
+  const { error } = await SB.from('reports').insert({ reporter:S.user.id, reported:id, reason:where, details:why||null });
+  if(error) { toast('Could not send report: '+error.message); return false; }
+  toast('Reported and blocked. Thank you for telling us.'); return true;
+}
+async function shareNight(name, lat, lng){
+  const url='https://maps.google.com/?q='+lat+','+lng;
+  const t=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const text=`I'm at ${name} (since ${t}). Meeting people through MIRL tonight. Here's where: ${url}`;
+  try{ if(navigator.share){ await navigator.share({ title:'Where I am tonight', text }); return; } }catch(e){ if(e.name==='AbortError') return; }
+  try{ await navigator.clipboard.writeText(text); toast('Copied. Paste it to a friend.'); }catch{ prompt('Copy and send to a friend:', text); }
+}
 const S = { user:null, profile:null, tab:'map', venues:[], map:null };
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -375,10 +390,13 @@ async function openVenue(id){
     };
     const go=async pos=>{
       const d=dist(pos.coords.latitude,pos.coords.longitude,v.lat,v.lng);
-      if(d > CHECKIN_RADIUS_M + Math.min(pos.coords.accuracy||0,150)) return err.textContent=`You look about ${Math.round(d)} m away. Check in once you're inside.`;
-      const { error } = await SB.rpc('check_in',{ venue: vid });
-      if(error) return err.textContent='Could not check in: '+error.message;
-      err.textContent=''; toast('Checked in'); openInside(vid, v.name);
+      const acc=pos.coords.accuracy||0, allowed=Math.min(250, CHECKIN_RADIUS_M + Math.min(acc,150));
+      if(d > allowed) return err.textContent = acc>150
+        ? `Your GPS is weak in here (about ${Math.round(acc)} m off). Step outside or near the door for a few seconds and tap check in again.`
+        : `You look about ${Math.round(d)} m away. Check in once you're there.`;
+      const { error } = await SB.rpc('check_in',{ venue: vid, p_lat:pos.coords.latitude, p_lng:pos.coords.longitude, p_acc:acc });
+      if(error) return err.textContent = /too_far/.test(error.message) ? 'You look a little too far away. Step inside or near the door and tap check in again.' : 'Could not check in: '+error.message;
+      err.textContent=''; toast('Checked in'); openInside(vid, v.name, v.lat, v.lng);
     };
     navigator.geolocation.getCurrentPosition(go, e=>{
       if(e.code===1) return fail(e);
@@ -388,20 +406,22 @@ async function openVenue(id){
 }
 
 // ---------- inside (people here) ----------
-async function openInside(vid, name){
+async function openInside(vid, name, lat, lng){
   const { data:people, error } = await SB.rpc('people_here');
   $app.innerHTML = `<div class="screen">
     <button class="back" id="bk">‹ Map</button>
-    <p class="small muted">Checked in</p><h1>${esc(name)}</h1>
+    <div class="row between"><div><p class="small muted">Checked in</p><h1>${esc(name)}</h1></div><button class="btn sm" id="share">📍 Share my night</button></div>
     <div class="row between"><h2>Here now · best matches first</h2><span class="small muted">Visible only inside</span></div>
     <div class="list" id="ppl">${error?'<p class="err">'+esc(error.message)+'</p>':(people||[]).length? people.map(p=>`<div class="item" style="cursor:default">
       ${av(p.avatar_icon,p.avatar_color)}
       <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(p.handle)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
       <p class="small muted">${p.shared_interests?p.shared_interests+' shared interest'+(p.shared_interests>1?'s':''):''}</p></div>
-      <button class="btn gold sm" data-id="${p.id}">Say hi</button></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${p.id}">Say hi</button><button class="back small" data-rep="${p.id}" style="font-size:12px">Report</button></div></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
     <p class="small muted">"Open to casual" only shows when you both turned it on.</p>
   </div>`;
   document.getElementById('bk').onclick=()=>setTab('map');
+  document.getElementById('share').onclick=()=>shareNight(name, lat, lng);
+  document.querySelectorAll('#ppl button[data-rep]').forEach(b=>b.onclick=async()=>{ if(await reportPerson(b.dataset.rep,'room')) openInside(vid,name,lat,lng); });
   document.querySelectorAll('#ppl button[data-id]').forEach(b=>b.onclick=async()=>{
     b.disabled=true; const { data, error } = await SB.rpc('say_hi',{ target:b.dataset.id });
     if(error){ b.disabled=false; return toast(error.message); }
@@ -464,10 +484,11 @@ async function openPlan(pid){
       : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color)}
         <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
         <p class="small muted">${g.shared_interests?g.shared_interests+' shared interest'+(g.shared_interests>1?'s':''):''}</p></div>
-        <button class="btn gold sm" data-id="${g.id}">Say hi</button></div>`).join('')}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${g.id}">Say hi</button><button class="back small" data-rep="${g.id}" style="font-size:12px">Report</button></div></div>`).join('')}</div>
         <p class="small muted">If you both say hi, a chat opens before you get there.</p>`
       : '<p class="small muted">Nobody else who fits your settings has RSVP\'d yet.</p>'}
   </div>`;
+  document.querySelectorAll('#gw button[data-rep]').forEach(b=>b.onclick=async()=>{ if(await reportPerson(b.dataset.rep,'plan')) openPlan(pid); });
   document.querySelectorAll('#gw button[data-id]').forEach(b=>b.onclick=async()=>{
     b.disabled=true; const { data, error } = await SB.rpc('say_hi_plan',{ target:b.dataset.id, pid });
     if(error){ b.disabled=false; return toast(error.message); }
