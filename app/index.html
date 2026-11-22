@@ -58,8 +58,8 @@ input[type=text],input[type=date],input[type=datetime-local],input[type=number],
 .avatar img{width:100%;height:100%;object-fit:cover}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:#171424;border-top:1px solid var(--line);padding:8px 8px max(14px,env(safe-area-inset-bottom));z-index:1000}
 [hidden]{display:none!important}
-nav.tabs .in{max-width:480px;width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
-nav.tabs button{background:none;border:none;color:var(--muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;cursor:pointer}
+nav.tabs .in{max-width:480px;width:100%;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+nav.tabs button{background:none;border:none;color:var(--muted);font-size:11px;white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;cursor:pointer}
 nav.tabs button[aria-current=page]{color:var(--gold);font-weight:600}
 nav.tabs svg{width:22px;height:22px}
 nav.tabs button{position:relative}
@@ -112,6 +112,7 @@ html.locked #app,html.locked nav.tabs{visibility:hidden}
 <div id="app"></div>
 <nav class="tabs" id="tabs" hidden><div class="in">
   <button data-tab="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Map</button>
+  <button data-tab="discover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Discover</button>
   <button data-tab="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>Plans</button>
   <button data-tab="chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>Chats</button>
   <button data-tab="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg>Living Room</button>
@@ -701,7 +702,7 @@ async function drawNotify(){
     const n=Object.assign({}, S.profile.notify||{}, { [b.dataset.nk]:v }); S.profile.notify=n; await SB.from('profiles').update({ notify:n }).eq('id',S.user.id); });
 }
 async function boot(){
-  { const h=location.hash.slice(1); if(['map','plans','chats','me'].includes(h)){ S.tab=h; document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current', b.dataset.tab===h?'page':'false')); history.replaceState(null,'',location.pathname+location.search); } }
+  { const h=location.hash.slice(1); if(['map','discover','plans','chats','me'].includes(h)){ S.tab=h; document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current', b.dataset.tab===h?'page':'false')); history.replaceState(null,'',location.pathname+location.search); } }
   await Promise.race([AVA_P, new Promise(r=>setTimeout(r,4000))]);
   const { data:{ session } } = await SB.auth.getSession();
   S.user = session?.user || null;
@@ -719,7 +720,7 @@ function render(){
   if(!S.user) return renderWelcome();
   if(!S.profile) return renderOnboard();
   if(!S.profile.handle){ S.tab='me'; return renderMe(true); }
-  ({map:renderMap, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
+  ({map:renderMap, discover:renderDiscover, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
   refreshBadges();
 }
 // ---------- tab badges: unread chats + friend requests, plans in the next 24h ----------
@@ -1123,6 +1124,108 @@ async function renderPlans(){
   box.querySelectorAll('[data-yes],[data-no]').forEach(b=>b.onclick=async()=>{ const pid=b.dataset.yes||b.dataset.no, ok=!!b.dataset.yes; b.disabled=true;
     const { error } = await SB.rpc('answer_plan_invite',{ pid, ok }); if(error){ b.disabled=false; return toast(error.message); }
     refreshBadges(); if(ok){ toast("You're going"); openPlan(pid); } else renderPlans(); });
+}
+
+// ---------- discover: find people to meet (dating or friends), send Meet invites, open plans nearby ----------
+let DSC={ mode:null, miles:15 };
+function getPos(){ return new Promise((res,rej)=>{ if(!navigator.geolocation) return rej(new Error('Location is not available on this device'));
+  navigator.geolocation.getCurrentPosition(p=>res(p.coords), ()=>rej(new Error('Allow location so MIRL can show people nearby')), { enableHighAccuracy:false, timeout:12000, maximumAge:600000 }); }); }
+async function renderDiscover(){
+  const p=S.profile; if(!DSC.mode) DSC.mode = p.mode==='friends'?'friends':'dating';
+  if(!p.discoverable){
+    $app.innerHTML=`<div class="screen"><h1>Discover</h1>
+      <div class="card"><p style="font-weight:600;font-size:18px">Find people to actually meet 🧭</p>
+      <p class="small muted" style="margin:8px 0 12px">Browse members nearby who want to date or make friends, then send a <b style="color:var(--ink)">Meet invite</b>: a spot, a time and a short note. If they say yes, a chat opens and it goes on both your plans.</p>
+      <p class="small muted" style="margin-bottom:12px">You only show up here if you turn it on. People see your avatar, handle, age, bio and shared interests, plus a rough distance. Never your name, photos or exact location.</p>
+      <button class="btn gold" id="don">Show me in Discover</button><p class="err" id="derr"></p></div>
+      <div id="dplans"></div></div>`;
+    document.getElementById('don').onclick=async()=>{ const e=document.getElementById('derr'); e.textContent='';
+      try{ const c=await getPos(); const { error } = await SB.rpc('set_discover',{ on_:true, p_lat:c.latitude, p_lng:c.longitude }); if(error) throw error;
+        S.profile.discoverable=true; S.profile.disc_lat=Math.round(c.latitude*100)/100; S.profile.disc_lng=Math.round(c.longitude*100)/100; toast("You're in Discover"); renderDiscover(); }
+      catch(x){ e.textContent=x.message; } };
+    return;
+  }
+  const free=p.free_until && new Date(p.free_until)>Date.now();
+  $app.innerHTML=`<div class="screen">
+    <div class="row between"><h1>Discover</h1><button class="back small" id="doff">Hide me</button></div>
+    <div class="seg" style="grid-template-columns:1fr 1fr" id="dmode"><button data-m="dating" aria-pressed="${DSC.mode==='dating'}">💘 Dating</button><button data-m="friends" aria-pressed="${DSC.mode==='friends'}">🤝 Friends</button></div>
+    <div class="row between"><div class="row" style="gap:8px"><span class="small muted">Within</span><select id="dmi" style="width:auto;min-height:38px;padding:4px 10px">${[5,15,30,50].map(m=>`<option value="${m}" ${DSC.miles===m?'selected':''}>${m} mi</option>`).join('')}</select></div>
+      <div class="row" style="gap:8px"><span class="small" style="font-weight:600">🌙 Free tonight</span><button class="switch" id="dfree" role="switch" aria-checked="${!!free}" aria-label="I'm free tonight"></button></div></div>
+    <div id="dinv"></div>
+    <h2>People</h2>
+    <div class="list" id="dlist"><p class="small muted">Looking around…</p></div>
+    <h2>Open plans nearby</h2>
+    <div class="list" id="dplans"><p class="small muted">Loading…</p></div>
+  </div>`;
+  document.getElementById('doff').onclick=async()=>{ if(!confirm('Hide yourself from Discover? Your pending invites stay.')) return; await SB.rpc('set_discover',{ on_:false, p_lat:null, p_lng:null }); S.profile.discoverable=false; renderDiscover(); };
+  document.querySelectorAll('#dmode button').forEach(b=>b.onclick=()=>{ DSC.mode=b.dataset.m; renderDiscover(); });
+  document.getElementById('dmi').onchange=e=>{ DSC.miles=+e.target.value; renderDiscover(); };
+  document.getElementById('dfree').onclick=async e=>{ const on=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',on);
+    const { data, error } = await SB.rpc('set_free_tonight',{ on_:on }); if(error) return toast(error.message); S.profile.free_until=data; toast(on?"You're showing as free tonight 🌙":'Free tonight is off'); };
+  drawMeetInvites();
+  const [{ data:ppl, error }, { data:pl }] = await Promise.all([SB.rpc('discover',{ p_mode:DSC.mode, p_miles:DSC.miles }), SB.rpc('open_plans_near',{ p_lat:p.disc_lat, p_lng:p.disc_lng, p_miles:DSC.miles })]);
+  const box=document.getElementById('dlist'); if(!box) return;
+  if(error) box.innerHTML=`<p class="small" style="color:var(--red)">${esc(error.message)}</p>`;
+  else box.innerHTML=(ppl||[]).length?ppl.map(o=>`<div class="item" style="cursor:default;align-items:flex-start">${av(o.avatar_icon,o.avatar_color,56)}
+      <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(o.handle)}${o.verified?' <span style="color:var(--green)">✓</span>':''}<span class="muted" style="font-weight:400">, ${o.age}</span></p>
+      <p class="small muted">~${o.miles} mi${o.free_tonight?' · <span style="color:var(--gold)">🌙 Free tonight</span>':''}</p>
+      ${o.bio?`<p class="small" style="margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(o.bio)}</p>`:''}
+      ${o.shared?`<p class="small" style="color:var(--violet);margin-top:4px">${o.shared} in common: ${o.shared_list.slice(0,3).map(esc).join(', ')}${o.shared>3?'…':''}</p>`:''}</div>
+      <button class="btn sm ${o.invited?'':'gold'}" data-inv="${o.id}" style="width:auto;flex-shrink:0" ${o.invited?'disabled':''}>${o.invited?'Invited ✓':'Invite'}</button></div>`).join('')
+    : `<p class="small muted">Nobody nearby in ${DSC.mode==='dating'?'Dating':'Friends'} yet. Try a bigger distance, switch modes, or check back. Invite your friends to join MIRL!</p>`;
+  box.querySelectorAll('[data-inv]').forEach(b=>b.onclick=()=>meetSheet((ppl||[]).find(o=>o.id===b.dataset.inv)));
+  const pb=document.getElementById('dplans'); if(pb) pb.innerHTML=(pl||[]).length?pl.map(x=>{ const w=when(x.starts_at); return `<button class="item" data-pl="${x.plan_id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(x.title)}</p><p class="small muted">${esc(x.venue)} · ~${x.miles} mi · ${x.going} going${x.im_going?' · <span style="color:var(--green)">you ✓</span>':''}</p></div></button>`; }).join('')
+    : '<p class="small muted">No open plans nearby this week. Start one from Plans!</p>';
+  pb?.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>openPlan(b.dataset.pl));
+}
+async function drawMeetInvites(){
+  const box=document.getElementById('dinv'); if(!box) return; const { data } = await SB.rpc('my_meet_invites'); if(!document.body.contains(box)) return;
+  const L=data||[]; if(!L.length){ box.innerHTML=''; return; }
+  const inc=L.filter(i=>i.incoming&&i.status==='pending'&&!i.expired), rest=L.filter(i=>!(i.incoming&&i.status==='pending'&&!i.expired));
+  const fmt=t=>new Date(t).toLocaleString('en-US',{ weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  box.innerHTML=(inc.length?`<h2>Invites for you</h2><div class="list">${inc.map(i=>`<div class="card" style="border-color:var(--gold)"><div class="row" style="gap:12px">${av(i.avatar_icon,i.avatar_color,48)}<div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(i.handle)}${i.verified?' <span style="color:var(--green)">✓</span>':''}<span class="muted" style="font-weight:400">, ${i.age} · ${i.mode==='dating'?'💘':'🤝'}</span></p><p class="small">📍 ${esc(i.venue)} · ${fmt(i.starts_at)}</p></div></div>
+      ${i.note?`<p style="margin:10px 0 0;font-style:italic">"${esc(i.note)}"</p>`:''}${i.bio?`<p class="small muted" style="margin-top:6px">${esc(i.bio)}</p>`:''}
+      <div class="row" style="gap:8px;margin-top:12px"><button class="btn sm gold" data-yes="${i.id}">Yes, let's meet</button><button class="btn sm" data-no="${i.id}">No thanks</button></div></div>`).join('')}</div>`:'')
+    + (rest.length?`<h2>Your invites</h2><div class="list">${rest.map(i=>{ const st=i.status==='accepted'?'<span style="color:var(--green)">✓ Going</span>':i.expired?'<span class="muted">No answer</span>':'<span style="color:var(--gold)">Waiting</span>';
+        return `<div class="item" ${i.status==='accepted'&&i.plan_id?`data-pl="${i.plan_id}"`:'style="cursor:default"'}>${av(i.avatar_icon,i.avatar_color,40)}<div style="flex:1;min-width:0"><p style="font-weight:600">${i.incoming?'From':'To'} @${esc(i.handle)}</p><p class="small muted">${esc(i.venue)} · ${fmt(i.starts_at)}</p></div><span class="small">${st}</span></div>`; }).join('')}</div>`:'');
+  box.querySelectorAll('[data-yes],[data-no]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.yes; b.disabled=true;
+    const { data:pid, error } = await SB.rpc('answer_meet_invite',{ p_id:b.dataset.yes||b.dataset.no, ok }); if(error){ b.disabled=false; return toast(error.message); }
+    refreshBadges(); if(ok){ toast("It's a plan! Your chat is open 🎉"); openPlan(pid); } else { toast('Declined. They won\'t be told.'); drawMeetInvites(); } });
+  box.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>openPlan(b.dataset.pl));
+}
+async function meetSheet(o){ if(!o) return;
+  if(!S.profile.verified) return toast('Get your ✓ first (Living Room → Get verified) to send invites');
+  const { data:mine } = await SB.rpc('my_upcoming_plans'); const plans=mine||[];
+  const def=new Date(); if(def.getHours()>=19) def.setDate(def.getDate()+1); def.setHours(20,0,0,0);
+  const local=new Date(def-def.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  let mode=plans.length?'plan':'new', planId=null, venue=null;
+  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+    <div class="row between"><h2 style="margin:0">Invite @${esc(o.handle)} to meet</h2><button class="back" data-x aria-label="Close">✕</button></div>
+    ${plans.length?`<div class="seg" style="grid-template-columns:1fr 1fr" id="mk"><button data-k="plan" aria-pressed="true">One of my plans</button><button data-k="new" aria-pressed="false">New meet-up</button></div>`:''}
+    <div id="mplan" ${plans.length?'':'hidden'}><div class="list">${plans.map(x=>{ const w=when(x.starts_at); return `<button class="item" data-p="${x.plan_id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(x.title)}</p><p class="small muted">${esc(x.venue)}</p></div><span class="ck" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--line)"></span></button>`; }).join('')}</div></div>
+    <div id="mnew" ${plans.length?'hidden':''} style="display:flex;flex-direction:column;gap:10px">
+      <label class="f">Where (a public spot)<input type="text" id="mq" autocomplete="off" placeholder="Start typing a bar, café, park…"></label>
+      <div class="list" id="msug" style="gap:6px;margin-top:-6px"></div><p class="small" id="mpick" style="color:var(--green)"></p>
+      <label class="f">When<input type="datetime-local" id="mwh" value="${local}"></label></div>
+    <label class="f">Note <span class="small muted">· optional</span><input type="text" id="mnote" maxlength="140" placeholder="${DSC.mode==='dating'?'Drinks and trivia? I\'ll be the one losing 😅':'Want to check out the live music?'}"></label>
+    <p class="small muted">They'll see your avatar, handle, age, bio and this invite. If they say no, you won't be told. You can send 5 a day.</p>
+    <p class="err" id="merr"></p><button class="btn gold" id="msend">Send invite</button></div>`;
+  document.body.appendChild(d); const close=()=>d.remove(); d.querySelector('[data-x]').onclick=close; d.onclick=e=>{ if(e.target===d) close(); };
+  d.querySelectorAll('#mk button').forEach(b=>b.onclick=()=>{ mode=b.dataset.k; d.querySelectorAll('#mk button').forEach(x=>x.setAttribute('aria-pressed',x===b)); d.querySelector('#mplan').hidden=mode!=='plan'; d.querySelector('#mnew').hidden=mode!=='new'; });
+  d.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ planId=b.dataset.p; d.querySelectorAll('[data-p] .ck').forEach(c=>{ c.style.background=''; c.style.borderColor=''; }); const c=b.querySelector('.ck'); c.style.background='var(--violet)'; c.style.borderColor='var(--violet)'; });
+  const mq=d.querySelector('#mq'), sug=d.querySelector('#msug'), mp=d.querySelector('#mpick'); let tmr;
+  const show=items=>{ sug.innerHTML=items.map((v,i)=>`<button class="item" data-i="${i}" style="padding:10px 12px"><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(v.name)}</p><p class="small muted">${esc([v.category,v.address].filter(Boolean).join(' · '))}</p></div></button>`).join('');
+    sug.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ venue=items[+b.dataset.i]; mq.value=venue.name; sug.innerHTML=''; mp.textContent='📍 '+venue.name; }); };
+  mq.oninput=()=>{ venue=null; mp.textContent=''; clearTimeout(tmr); const q=mq.value.trim(); if(q.length<2){ sug.innerHTML=''; return; }
+    tmr=setTimeout(async()=>{ const { data } = await SB.rpc('search_venues',{ q, p_lat:S.profile.disc_lat||26.46, p_lng:S.profile.disc_lng||-80.07 });
+      const out=(data||[]).filter(v=>v.is_public!==false).slice(0,6); if(!out.length){ sug.innerHTML='<p class="small muted">No match on MIRL yet. Try another spot, or start a plan there from Plans first.</p>'; return; } show(out); },300); };
+  d.querySelector('#msend').onclick=async()=>{ const err=d.querySelector('#merr'); err.textContent='';
+    let args={ p_to:o.id, p_mode:DSC.mode, p_venue:null, p_starts:null, p_note:d.querySelector('#mnote').value.trim()||null, p_plan:null };
+    if(mode==='plan'){ if(!planId) return err.textContent='Pick one of your plans, or tap New meet-up.'; args.p_plan=planId; }
+    else { if(!venue) return err.textContent='Start typing the spot, then tap it in the list.'; const w=d.querySelector('#mwh').value; if(!w) return err.textContent='Pick a time.'; args.p_venue=venue.id; args.p_starts=new Date(w).toISOString(); }
+    const btn=d.querySelector('#msend'); btn.disabled=true; const { error } = await SB.rpc('send_meet_invite',args); btn.disabled=false;
+    if(error) return err.textContent=error.message; close(); toast('Invite sent 💌 They have 48 hours to answer.'); renderDiscover(); };
 }
 
 // ---------- chats ----------
