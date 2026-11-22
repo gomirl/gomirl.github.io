@@ -13,6 +13,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MIRL">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>try{ if(/[?&]plain=1/.test(location.search)) localStorage.setItem('mirl_plain','1');
+  if(localStorage.getItem('mirl_plain')==='1'){ document.title='Hub'; document.querySelector('link[rel=manifest]').href='/manifest-plain.webmanifest'; document.querySelector('link[rel=apple-touch-icon]').href='/icon-plain-180.png'; document.querySelector('link[rel=icon]').href='/icon-plain-192.png'; document.querySelector('meta[name=apple-mobile-web-app-title]').content='Hub'; }
+  if(localStorage.getItem('mirl_lock')) document.documentElement.classList.add('locked'); }catch(e){}</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
@@ -57,6 +60,9 @@ nav.tabs .in{max-width:480px;width:100%;display:grid;grid-template-columns:repea
 nav.tabs button{background:none;border:none;color:var(--muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:48px;justify-content:center;cursor:pointer}
 nav.tabs button[aria-current=page]{color:var(--gold);font-weight:600}
 nav.tabs svg{width:22px;height:22px}
+nav.tabs button{position:relative}
+nav.tabs .bdg{position:absolute;top:2px;left:calc(50% + 6px);background:var(--red);color:#fff;border-radius:9px;font:700 11px/18px var(--body);min-width:18px;height:18px;padding:0 5px;text-align:center}
+.ubdg{background:var(--red);color:#fff;border-radius:10px;font:700 12px/20px var(--body);min-width:20px;height:20px;padding:0 6px;text-align:center;flex-shrink:0}
 #map{height:46vh;min-height:300px;border-radius:22px;overflow:hidden;border:1px solid var(--line)}
 .leaflet-container{background:#1A1727;font-family:var(--body)}
 .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9) saturate(.6)}
@@ -74,6 +80,19 @@ nav.tabs svg{width:22px;height:22px}
 .bubble{max-width:80%;padding:10px 14px;border-radius:18px;background:var(--surface2);align-self:flex-start;line-height:1.35}
 .bubble.me{background:var(--violet);color:var(--bg);align-self:flex-end}
 .msg{display:flex;flex-direction:column;align-items:flex-start}
+html.locked #app,html.locked nav.tabs{visibility:hidden}
+.pinpad{position:fixed;inset:0;z-index:5000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+.pinpad .dots{display:flex;gap:14px;margin:6px 0}
+.pinpad .dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.pinpad .dots i.on{background:var(--ink);border-color:var(--ink)}
+.pinpad .keys{display:grid;grid-template-columns:repeat(3,72px);gap:12px}
+.pinpad .keys button{height:72px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 26px var(--display);cursor:pointer}
+.pinpad .keys button.blank{visibility:hidden}
+.pinpad .shake{animation:shk .35s}
+@keyframes shk{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.decoy{position:fixed;inset:0;z-index:4500;background:#F7F7F5;color:#222;display:flex;flex-direction:column;padding:max(18px,env(safe-area-inset-top)) 18px 18px;font-family:-apple-system,system-ui,sans-serif}
+.decoy h1{font:700 30px -apple-system,system-ui,sans-serif;color:#222;margin:8px 0 12px;-webkit-user-select:none;user-select:none}
+.decoy textarea{flex:1;border:0;background:transparent;color:#222;font:17px/1.5 -apple-system,system-ui,sans-serif;resize:none;outline:none}
 .msg.me{align-items:flex-end}
 .msg .bubble{align-self:auto;cursor:pointer;-webkit-user-select:none;user-select:none}
 .quote{font-size:12px;color:var(--muted);border-left:3px solid var(--violet);padding:2px 8px;margin:0 4px 3px;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -325,6 +344,70 @@ async function shareNight(name, lat, lng){
   try{ await navigator.clipboard.writeText(text); toast('Copied. Paste it to a friend.'); }catch{ prompt('Copy and send to a friend:', text); }
 }
 const S = { user:null, profile:null, tab:'map', venues:[], map:null };
+// ---------- Discreet Mode: PIN lock, quick hide, plain icon (all stored on this phone only) ----------
+const lsGet=k=>{ try{ return localStorage.getItem(k); }catch{ return null; } }, lsSet=(k,v)=>{ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch{} };
+const getLock=()=>{ try{ return JSON.parse(lsGet('mirl_lock')||'null'); }catch{ return null; } };
+async function sha(t){ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+function pinPad(title, sub, onPin, forgot){
+  const d=document.createElement('div'); d.className='pinpad';
+  d.innerHTML=`<p style="font:700 22px var(--display)">${esc(title)}</p><p class="small muted" id="pps">${esc(sub)}</p><div class="dots">${'<i></i>'.repeat(4)}</div>
+    <div class="keys">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}<button class="${forgot===true?'':'blank'}" data-k="x" style="font-size:13px">${forgot===true?'Cancel':''}</button><button data-k="0">0</button><button data-k="del" style="font-size:20px">⌫</button></div>
+    ${forgot==='lock'?'<button class="back small" id="ppf" style="margin-top:8px">Forgot PIN? Sign out</button>':''}`;
+  document.body.appendChild(d); let pin='', busy=false; const dots=[...d.querySelectorAll('.dots i')], sb=d.querySelector('#pps');
+  const paint=()=>dots.forEach((x,i)=>x.classList.toggle('on',i<pin.length));
+  let waiting=false;
+  const api={ el:d, close:()=>d.remove(), fail:msg=>{ pin=''; paint(); sb.textContent=msg; const ds=d.querySelector('.dots'); ds.classList.remove('shake'); void ds.offsetWidth; ds.classList.add('shake'); }, wait:ms=>{ waiting=true; setTimeout(()=>{ waiting=false; busy=false; sb.textContent='Enter your PIN'; },ms); } };
+  d.querySelector('.keys').onclick=async e=>{ const k=e.target.closest('[data-k]')?.dataset.k; if(!k||busy) return;
+    if(k==='x'){ if(forgot!=='lock') api.close(); return; } if(k==='del'){ pin=pin.slice(0,-1); paint(); return; }
+    if(pin.length<4){ pin+=k; paint(); } if(pin.length===4){ busy=true; const p=pin; await onPin(p,api); if(!waiting) busy=false; } };
+  d.querySelector('#ppf')?.addEventListener('click', async()=>{ if(!confirm('Sign out to reset your PIN? You\'ll sign back in with Google.')) return; lsSet('mirl_lock',null); try{ await SB.auth.signOut(); }catch{} location.replace('/app/'); });
+  return api; }
+let lockFails=0;
+function showLock(){
+  if(!getLock()||document.querySelector('.pinpad[data-lock]')) { document.documentElement.classList.remove('locked'); return; }
+  document.documentElement.classList.add('locked');
+  const lk=pinPad(lsGet('mirl_plain')==='1'?'Locked':'MIRL is locked','Enter your PIN', async(p,api)=>{ const L=getLock();
+    if(await sha(L.salt+p)===L.hash){ lockFails=0; api.close(); document.documentElement.classList.remove('locked'); }
+    else if(++lockFails>=5){ api.fail('Too many tries. Wait 30 seconds.'); api.wait(30000); lockFails=0; } else api.fail('Wrong PIN. Try again.'); }, 'lock');
+  lk.el.setAttribute('data-lock','1'); }
+function setPin(done){
+  pinPad('Choose a 4-digit PIN','You\'ll need it every time you open MIRL on this phone.', async(p1,a1)=>{ a1.close();
+    pinPad('Enter it again','Just to be sure.', async(p2,a2)=>{ if(p1!==p2) return a2.fail('Didn\'t match. Try again.');
+      const salt=[...crypto.getRandomValues(new Uint8Array(12))].map(x=>x.toString(16).padStart(2,'0')).join('');
+      lsSet('mirl_lock', JSON.stringify({ salt, hash:await sha(salt+p2) })); a2.close(); toast('App lock is on'); done&&done(); }, true); }, true); }
+let hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') hiddenAt=Date.now(); else if(hiddenAt && Date.now()-hiddenAt>15000) showLock(); });
+// quick hide: double-tap the top of the screen
+function showDecoy(){ if(document.querySelector('.decoy')) return;
+  const d=document.createElement('div'); d.className='decoy';
+  d.innerHTML=`<h1 id="dt">Notes</h1><textarea id="dn" placeholder="Start typing…"></textarea>`; document.body.appendChild(d);
+  const ta=d.querySelector('#dn'); ta.value=lsGet('mirl_notes')||''; ta.oninput=()=>lsSet('mirl_notes',ta.value);
+  let t; const h=d.querySelector('#dt');
+  const start=()=>{ t=setTimeout(()=>{ d.remove(); showLock(); },900); }, stop=()=>clearTimeout(t);
+  h.addEventListener('touchstart',start,{passive:true}); h.addEventListener('touchend',stop); h.addEventListener('mousedown',start); h.addEventListener('mouseup',stop); h.addEventListener('mouseleave',stop); }
+let lastTap=0;
+const tapHide=(y)=>{ if(lsGet('mirl_qhide')!=='1'||y>90||document.querySelector('.decoy,.pinpad')) return; const n=Date.now(); if(n-lastTap<350){ lastTap=0; showDecoy(); } else lastTap=n; };
+document.addEventListener('touchend',e=>tapHide(e.changedTouches[0].clientY),{passive:true});
+document.addEventListener('dblclick',e=>{ if(lsGet('mirl_qhide')==='1'&&e.clientY<=90) showDecoy(); });
+async function drawDiscreet(){
+  const box=document.getElementById('dsc'); if(!box) return; const L=getLock(), quiet=(S.profile.notify||{}).quiet===true, qh=lsGet('mirl_qhide')==='1', plain=lsGet('mirl_plain')==='1';
+  box.innerHTML=`<p class="small muted" style="margin-bottom:10px">For anyone who wants MIRL to stay private. These settings stay on this phone.</p>
+    <div class="row between"><div><p style="font-weight:600">App lock</p><p class="small muted">${L?'On. A PIN is needed to open MIRL.':'Ask for a 4-digit PIN every time MIRL opens.'}</p></div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm ${L?'':'gold'}" id="dlk" style="width:auto">${L?'Change PIN':'Set PIN'}</button>${L?'<button class="back small" id="dlo" style="font-size:12px">Turn off</button>':''}</div></div>
+    <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quiet notifications</p><p class="small muted">Alerts just say "New activity". No names, spots or messages.</p></div><button class="switch" id="dqn" role="switch" aria-checked="${quiet}" aria-label="Quiet notifications"></button></div>
+    <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quick hide</p><p class="small muted">Double-tap the top of the screen to cover MIRL with a plain Notes page. Hold "Notes" for a second to come back.</p></div><button class="switch" id="dqh" role="switch" aria-checked="${qh}" aria-label="Quick hide"></button></div>
+    <div style="margin-top:14px"><p style="font-weight:600">Plain home-screen icon</p>
+      ${plain?`<p class="small muted">On. MIRL shows as <b>Hub</b> with a plain icon. If you still see the MIRL icon, delete it from your home screen, then in Safari tap Share, then Add to Home Screen.</p><button class="back small" id="dpo" style="font-size:12px">Switch back to the MIRL icon</button>`
+        :`<p class="small muted">Shows MIRL as <b>Hub</b> with a plain icon instead of the MIRL logo.</p><button class="btn sm" id="dpi" style="width:auto;margin-top:6px">Use the plain icon</button>`}</div>
+    <p class="small muted" style="margin-top:14px">More tips: keep Ghost Mode on, use a cartoon avatar instead of a photo, and sign in with a Google account only you use.</p>`;
+  document.getElementById('dlk').onclick=()=>setPin(drawDiscreet);
+  document.getElementById('dlo')?.addEventListener('click',()=>{ const a=pinPad('Enter your PIN','To turn off app lock.', async(p,api)=>{ const L=getLock(); if(await sha(L.salt+p)!==L.hash) return api.fail('Wrong PIN'); lsSet('mirl_lock',null); api.close(); toast('App lock is off'); drawDiscreet(); }, true); });
+  document.getElementById('dqn').onclick=async e=>{ const v=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',v);
+    const n=Object.assign({}, S.profile.notify||{}, { quiet:v }); S.profile.notify=n; await SB.from('profiles').update({ notify:n }).eq('id',S.user.id); };
+  document.getElementById('dqh').onclick=e=>{ const v=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',v); lsSet('mirl_qhide',v?'1':null); if(v) toast('Quick hide is on. Double-tap the top of the screen.'); };
+  document.getElementById('dpi')?.addEventListener('click',()=>{ lsSet('mirl_plain','1'); location.replace('/app/?plain=1#me'); });
+  document.getElementById('dpo')?.addEventListener('click',()=>{ lsSet('mirl_plain',null); location.replace('/app/#me'); });
+}
 // ---------- photos: private bucket, approved by MIRL, shown only after a mutual hi ----------
 const ADMIN_ID='7c5636fb-c2f9-4b05-98f1-84f85daf990d';
 // ---------- area activity: rough ~300 m block, no name, expires in 60 min, shown only when 3+ ----------
@@ -538,7 +621,17 @@ function render(){
   if(!S.profile) return renderOnboard();
   if(!S.profile.handle){ S.tab='me'; return renderMe(true); }
   ({map:renderMap, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
+  refreshBadges();
 }
+// ---------- tab badges: unread chats + friend requests, plans in the next 24h ----------
+let bdgT;
+async function refreshBadges(){ clearTimeout(bdgT); bdgT=setTimeout(async()=>{ if(!S.user||!S.profile) return;
+  const { data } = await SB.rpc('my_badges'); const b=(data||[])[0]||{};
+  [['chats',b.chats],['plans',b.plans]].forEach(([t,n])=>{ const btn=document.querySelector(`nav.tabs button[data-tab=${t}]`); if(!btn) return;
+    let el=btn.querySelector('.bdg'); if(!n){ el?.remove(); return; } if(!el){ el=document.createElement('span'); el.className='bdg'; btn.appendChild(el); } el.textContent=n>99?'99+':n; });
+  if(navigator.setAppBadge){ try{ b.chats?navigator.setAppBadge(b.chats):navigator.clearAppBadge(); }catch{} } },150); }
+setInterval(()=>{ if(document.visibilityState==='visible') refreshBadges(); }, 45000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshBadges(); });
 
 // ---------- welcome / sign in ----------
 function renderWelcome(){
@@ -935,6 +1028,7 @@ async function renderChats(){
     if(data==='friends'){ toast("You're friends now"); renderChats(); return; }
     m.style.color='var(--green)'; m.textContent=`Sent. If @${h} is on MIRL, they'll see your request.`; };
   document.getElementById('fsend').onclick=send; document.getElementById('fh').onkeydown=e=>{ if(e.key==='Enter') send(); };
+  SB.rpc('unread_by_chat').then(({data})=>(data||[]).forEach(u=>{ const it=document.querySelector(`.list .item[data-id="${u.cid}"]`); if(it&&u.n&&!it.querySelector('.ubdg')) it.insertAdjacentHTML('beforeend',`<span class="ubdg">${u.n}</span>`); }));
   const { data:reqs } = await SB.rpc('my_friend_requests'); const fr=document.getElementById('freqs'); if(!fr) return;
   fr.innerHTML=(reqs||[]).length?`<h2>Friend requests</h2><div class="list">${reqs.map(r=>`<div class="item" style="cursor:default">${av(r.avatar_icon,r.avatar_color,null,'u:'+r.from_id)}<div style="flex:1"><p style="font-weight:600">@${esc(r.handle)}<span data-vb="u:${r.from_id}"></span></p><p class="small muted">wants to be friends</p></div>
     <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm gold" data-acc="${r.from_id}" style="width:auto">Accept</button><button class="back small" data-dec="${r.from_id}" style="font-size:12px">Decline</button></div></div>`).join('')}</div>`:'';
@@ -988,9 +1082,10 @@ async function openChat(cid){
     if(e.target.closest('.bubble')){ if(msgEl.querySelector('.mbar')) msgEl.querySelector('.mbar').remove(); else openBar(id); } };
   document.getElementById('rx').onclick=()=>{ replyTo=null; document.getElementById('rbar').hidden=true; };
   box.lastElementChild?.scrollIntoView({block:'end'});
+  SB.rpc('mark_read',{ cid }).then(refreshBadges);
   if(S.chan) SB.removeChannel(S.chan);
   S.chan = SB.channel('chat-'+cid)
-    .on('postgres_changes',{ event:'INSERT', schema:'public', table:'messages', filter:'connection_id=eq.'+cid }, p=>addMsg(p.new))
+    .on('postgres_changes',{ event:'INSERT', schema:'public', table:'messages', filter:'connection_id=eq.'+cid }, p=>{ addMsg(p.new); if(p.new.sender!==S.user.id) SB.rpc('mark_read',{ cid }); })
     .on('postgres_changes',{ event:'*', schema:'public', table:'message_reactions', filter:'connection_id=eq.'+cid }, p=>{ const r=p.eventType==='DELETE'?p.old:p.new; if(!r||!r.message_id||r.user_id===S.user.id) return; setReact(r.message_id, r.user_id, p.eventType==='DELETE'?null:r.emoji); })
     .subscribe();
   const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; tx.value=''; const rt=replyTo; replyTo=null; document.getElementById('rbar').hidden=true;
@@ -1040,6 +1135,8 @@ function renderMe(needHandle){
     </div>
     <h2>Notifications</h2>
     <div class="card" id="ntf"></div>
+    <h2>Discreet Mode</h2>
+    <div class="card" id="dsc"></div>
     <h2>Privacy</h2>
     <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">On: your friends can't see where you are. Off: your spot counts toward "friends here" on their map. A small number can still hint it's you, so leave it on if you'd rather not be found. Strangers never see you unless they're inside the same spot, either way.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
     <div class="card row between"><div><p style="font-weight:600">Count me in area activity</p><p class="small muted">While MIRL is open, you add to the purple glow on the map. It only uses a rough area about 3 blocks wide, never your name, disappears after an hour, and only shows when 3 or more people are around.</p></div><button class="switch" id="as" role="switch" aria-checked="${act}" aria-label="Count me in area activity"></button></div>
@@ -1052,7 +1149,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
   wireId(ist);
-  drawMyPhotos(); drawReview(); drawNotify(); drawVerify();
+  drawMyPhotos(); drawReview(); drawNotify(); drawVerify(); drawDiscreet();
   document.getElementById('admbtn')?.addEventListener('click', renderAdmin);
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
@@ -1082,6 +1179,7 @@ async function handleJoin(){
   if(error) return toast('That invite link is not valid');
   toast("You're in"); openPlan(data);
 }
+showLock();
 boot().then(handleJoin);
 </script>
 </body>
