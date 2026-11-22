@@ -221,23 +221,42 @@ function avUri(code){ if(!window.AVA) return ''; if(AV_CACHE[code]) return AV_CA
   return AV_CACHE[code]; }
 const avImg=(code,face)=>{ const u=avUri(code); return u?`<img src="${u}" alt="" style="width:100%;height:100%;${face?'transform:scale(2) translateY(6%)':'transform:translateY(4%)'}">`:''; };
 const isCustom=i=>isBuilt(i)||isAva(i);
-function av(icon,color,size){ size=size||48; const inner=isAva(icon)?avImg(icon):isBuilt(icon)?abSvg(abParse(icon)):esc(icon||'✨'); return `<div class="avatar" style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${inner}</div>`; }
+function av(icon,color,size,key){ size=size||48; const inner=isAva(icon)?avImg(icon):isBuilt(icon)?abSvg(abParse(icon)):esc(icon||'✨'); return `<div class="avatar"${key?` data-ap="${esc(key)}"`:''} style="width:${size}px;height:${size}px;background:${esc(color||'#7B78FF')};font-size:${Math.round(size*.5)}px">${inner}</div>`; }
+const photoAv=(url,size)=>`<div class="avatar" style="width:${size}px;height:${size}px"><img src="${esc(url)}" alt="" style="width:100%;height:100%;object-fit:cover"></div>`;
+// swap in approved photo avatars wherever av(...,key) was drawn
+let apBusy=false;
+async function fillAvatarPhotos(){
+  if(apBusy||!S.user) return; const els=[...document.querySelectorAll('[data-ap]:not([data-apdone])')]; if(!els.length) return; apBusy=true;
+  try{ els.forEach(e=>e.dataset.apdone='1');
+    const uids=[...new Set(els.filter(e=>e.dataset.ap.startsWith('u:')).map(e=>e.dataset.ap.slice(2)))], hasC=els.some(e=>e.dataset.ap.startsWith('c:'));
+    const map={};
+    if(uids.length){ const { data } = await SB.rpc('avatar_photos',{ uids }); (data||[]).forEach(r=>map['u:'+r.id]=r.path); }
+    if(hasC){ const { data } = await SB.rpc('chat_avatar_photos'); (data||[]).forEach(r=>map['c:'+r.cid]=r.path); }
+    const urls=await signedUrls([...new Set(Object.values(map))]);
+    els.forEach(e=>{ const u=urls[map[e.dataset.ap]]; if(u) e.innerHTML=`<img src="${esc(u)}" alt="" style="width:100%;height:100%;object-fit:cover">`; });
+  }catch{} apBusy=false; if(document.querySelector('[data-ap]:not([data-apdone])')) fillAvatarPhotos(); }
+new MutationObserver(()=>{ clearTimeout(window.__apT); window.__apT=setTimeout(fillAvatarPhotos,60); }).observe(document.getElementById('app'),{ childList:true, subtree:true });
 const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
     <h2>How you show up in the room</h2>
     <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
     <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."><span class="small" id="hdmsg">Lowercase letters, numbers, _ or . (3–20)</span></label></div>
+    <button class="btn sm" id="avtog" style="width:auto;margin-top:8px">${h?'Change avatar ▾':'Hide avatar options ▴'}</button>
+    <div id="avopts" ${h?'hidden':''}>
     <div class="seg" id="avmode" style="margin:10px 0"><button data-v="e" aria-pressed="${!isCustom(icon)}">Emoji</button><button data-v="b" aria-pressed="${isCustom(icon)}">Build my own</button></div>
     <div class="chips" id="icons" ${isCustom(icon)?'hidden':''}>${ICONS.map(i=>`<button class="chip" style="min-width:44px;font-size:20px" aria-pressed="${i===icon}" aria-label="Avatar ${i}">${i}</button>`).join('')}</div>
     <div id="builder" ${isCustom(icon)?'':'hidden'}></div>
     <p class="small muted" style="margin-top:6px">Background color</p>
-    <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>`; }
+    <div class="chips" id="colors">${COLORS.map(c=>`<button class="chip" style="width:44px;background:${c};border-color:${c===color?'var(--ink)':c};border-width:${c===color?3:1}px" aria-pressed="${c===color}" aria-label="Color" data-c="${c}"></button>`).join('')}</div>
+    </div>`; }
 function wireId(st){
   const hd=document.getElementById('hd'), hm=document.getElementById('hdmsg'); let tmr;
   hd.oninput=()=>{ const c=hd.value.toLowerCase().replace(/[^a-z0-9_.]/g,''); if(c!==hd.value){ hd.value=c; hm.textContent='Only lowercase letters, numbers, _ or . allowed'; hm.style.color='var(--gold)'; }
     clearTimeout(tmr); tmr=setTimeout(async()=>{ if(!HANDLE_RE.test(hd.value)){ hm.textContent='3–20 characters'; hm.style.color='var(--muted)'; return; }
       const { data } = await SB.rpc('handle_available',{ h:hd.value }); hm.textContent = data===false?'Taken. Try another.':'@'+hd.value+' is yours if you save'; hm.style.color = data===false?'var(--red)':'var(--green)'; },400); };
-  const prev=()=>document.getElementById('avp').innerHTML=av(st.icon,st.color,64);
+  const prev=()=>document.getElementById('avp').innerHTML=S.myAvatarUrl?photoAv(S.myAvatarUrl,64):av(st.icon,st.color,64);
+  const tog=document.getElementById('avtog'), opts=document.getElementById('avopts');
+  tog.onclick=()=>{ opts.hidden=!opts.hidden; tog.textContent=opts.hidden?'Change avatar ▾':'Hide avatar options ▴'; };
   let lookG=undefined, bo=isAva(st.icon)?avParse(st.icon):avRandom(), lastEmoji=isCustom(st.icon)?ICONS[1]:st.icon;
   const bwrap=document.getElementById('builder');
   const hatTop=()=>bo.top>=1&&bo.top<=7;
@@ -310,9 +329,15 @@ async function drawMyPhotos(){
   const { data:rows } = await SB.from('photos').select('id,path,status').order('created_at'); const list=rows||[];
   const urls=await signedUrls(list.map(r=>r.path)); if(!document.body.contains(box)) return;
   const lab={pending:'Waiting for approval',approved:'Approved',rejected:'Not approved'}, col={pending:'var(--gold)',approved:'var(--green)',rejected:'var(--red)'};
-  box.innerHTML = list.map(r=>`<div style="width:96px"><button data-view="${esc(urls[r.path]||'')}" style="all:unset;cursor:pointer;display:block;width:96px;height:120px;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line)">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button><p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p><button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
+  box.innerHTML = list.map(r=>`<div style="width:96px"><button data-view="${esc(urls[r.path]||'')}" style="all:unset;cursor:pointer;display:block;width:96px;height:120px;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line)">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button><p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p>${r.status==='approved'?(S.profile.avatar_photo===r.path?`<button class="back small" data-unav="1" style="font-size:12px;min-height:28px;color:var(--gold)">★ Avatar · undo</button>`:`<button class="back small" data-av="${esc(r.path)}" style="font-size:12px;min-height:28px">Use as avatar</button>`):''}<button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
     + (list.filter(r=>r.status!=='rejected').length<4 ? `<button class="chip" id="phadd" aria-label="Add a photo" style="width:96px;height:120px;border-radius:12px;font-size:30px">+</button>` : '');
   box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ if(b.dataset.view) photoViewer(b.dataset.view); });
+  S.myAvatarUrl = S.profile.avatar_photo ? (urls[S.profile.avatar_photo]||null) : null;
+  const avp=document.getElementById('avp'); if(avp&&S.myAvatarUrl) avp.innerHTML=photoAv(S.myAvatarUrl,64);
+  const setAv=async path=>{ const { error } = await SB.from('profiles').update({ avatar_photo:path }).eq('id',S.user.id); if(error) return toast(error.message);
+    S.profile.avatar_photo=path; toast(path?'Your photo is now your avatar':'Back to your cartoon avatar'); if(!path){ S.myAvatarUrl=null; loadProfile(); } else drawMyPhotos(); };
+  box.querySelectorAll('[data-av]').forEach(b=>b.onclick=()=>{ if(confirm('Use this photo as your avatar? People at the same spot, on the same plan, or in a chat with you will see it instead of your cartoon.')) setAv(b.dataset.av); });
+  box.querySelectorAll('[data-unav]').forEach(b=>b.onclick=()=>setAv(null));
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Remove this photo?')) return;
     await SB.storage.from('photos').remove([b.dataset.path]); await SB.from('photos').delete().eq('id',b.dataset.del); drawMyPhotos(); });
   const add=document.getElementById('phadd'); if(add) add.onclick=()=>document.getElementById('phf').click();
@@ -655,7 +680,7 @@ async function openInside(vid, name, lat, lng){
     <div class="row between"><div><p class="small muted">Checked in</p><h1>${esc(name)}</h1></div><button class="btn sm" id="share">📍 Share my night</button></div>
     <div class="row between"><h2>Here now · best matches first</h2><span class="small muted">Visible only inside</span></div>
     <div class="list" id="ppl">${error?'<p class="err">'+esc(error.message)+'</p>':(people||[]).length? people.map(p=>`<div class="item" style="cursor:default">
-      ${av(p.avatar_icon,p.avatar_color)}
+      ${av(p.avatar_icon,p.avatar_color,null,'u:'+p.id)}
       <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(p.handle)}, ${p.age}${p.friends?` · with ${p.friends} friend${p.friends>1?'s':''}`:''}${p.open_to_casual?' · Open to casual':''}</p>
       <p class="small muted">${p.shared_interests?p.shared_interests+' shared interest'+(p.shared_interests>1?'s':''):''}</p></div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${p.id}">Say hi</button><button class="back small" data-rep="${p.id}" style="font-size:12px">Report</button></div></div>`).join('') : '<p class="muted">Nobody who fits your settings is checked in yet. Hang tight, or invite a friend.</p>'}</div>
@@ -723,7 +748,7 @@ async function openPlan(pid){
     ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
     <h2>Who's going</h2>
     ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
-      : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color)}
+      : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color,null,'u:'+g.id)}
         <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
         <p class="small muted">${g.shared_interests?g.shared_interests+' shared interest'+(g.shared_interests>1?'s':''):''}</p></div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${g.id}">Say hi</button><button class="back small" data-rep="${g.id}" style="font-size:12px">Report</button></div></div>`).join('')}</div>
@@ -760,7 +785,7 @@ async function renderChats(){
   const { data:cons } = await SB.rpc('my_chats');
   $app.innerHTML = `<div class="screen"><h1>Chats</h1>
     <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
-      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
+      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span></p>
       <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h if quiet · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here. It stays open as long as you keep talking, and disappears after 14 quiet hours unless you both tap Add friend.</p>'}</div></div>`;
   document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
 }
@@ -814,7 +839,7 @@ function renderMe(needHandle){
     ${idBlock(p.handle||'',ist.icon,ist.color)}
     <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b>${p.founding_member?' · <b style="color:var(--violet)">★ Founding Member</b>':''}</p>
     <h2>My photos</h2>
-    <p class="small muted" style="margin-bottom:10px">Optional, up to 4. MIRL checks every photo before anyone sees it. Approved photos show only inside a chat, after you both said hi. Must be you. No nudity.</p>
+    <p class="small muted" style="margin-bottom:10px">Optional, up to 4. MIRL checks every photo before anyone sees it. Approved photos show only inside a chat, after you both said hi, unless you pick one as your avatar. Must be you. No nudity.</p>
     <div id="ph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
     <input type="file" id="phf" accept="image/*" hidden>
     ${S.user.id===ADMIN_ID?'<div id="adm"></div>':''}
