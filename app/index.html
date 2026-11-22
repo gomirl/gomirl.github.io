@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="MIRL">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script>try{ if(/[?&]plain=1/.test(location.search)) localStorage.setItem('mirl_plain','1');
-  if(localStorage.getItem('mirl_plain')==='1'){ document.title='Hub'; document.querySelector('link[rel=manifest]').href='/manifest-plain.webmanifest'; document.querySelector('link[rel=apple-touch-icon]').href='/icon-plain-180.png'; document.querySelector('link[rel=icon]').href='/icon-plain-192.png'; document.querySelector('meta[name=apple-mobile-web-app-title]').content='Hub'; }
+  if(localStorage.getItem('mirl_plain')==='1'){ document.documentElement.classList.add('plain'); document.title='Hub'; document.querySelector('link[rel=manifest]').href='/manifest-plain.webmanifest'; document.querySelector('link[rel=apple-touch-icon]').href='/icon-plain-180.png'; document.querySelector('link[rel=icon]').href='/icon-plain-192.png'; document.querySelector('meta[name=apple-mobile-web-app-title]').content='Hub'; }
   if(localStorage.getItem('mirl_lock')) document.documentElement.classList.add('locked'); }catch(e){}</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -105,6 +105,8 @@ html.locked #app,html.locked nav.tabs{visibility:hidden}
 .mbar button{all:unset;cursor:pointer;font-size:22px;padding:2px 5px}
 .mbar button.rp{font-size:13px;font-weight:600;padding:4px 8px;border-left:1px solid var(--line);margin-left:4px}
 .hero{display:flex;flex-direction:column;gap:14px;padding-top:30px}
+.brandlogo{display:block;height:auto;pointer-events:none}
+html.plain .brandlogo{display:none!important}
 .logo{font-family:var(--display);font-weight:700;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,#5E66FF,#8A2BFF);-webkit-background-clip:text;color:transparent}
 </style>
 </head>
@@ -130,7 +132,7 @@ function pickField(id,label,opts,val){ const other = val && !opts.includes(val);
   <label class="f" id="${id}w" ${other?'':'hidden'}>In your words<input type="text" id="${id}" maxlength="40" value="${other?esc(val):''}"></label>`; }
 function pickVal(id){ const s=document.getElementById(id+'s').value; return s==='__o' ? (document.getElementById(id).value.trim()||null) : (s||null); }
 const ORIENTS=['Straight','Gay','Lesbian','Bisexual','Pansexual','Queer','Heteroflexible','Homoflexible','Asexual','Demisexual','Questioning'];
-const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🍉','🫓','🎲'];
+const ICONS=['🌙','✨','🔥','🌊','🌴','🌵','🍸','🍷','🎧','🎸','🎤','🎨','📸','🛹','🏄','🐬','🦩','🐙','🦊','🐻','🐝','🌻','🫓','🎲'];
 const COLORS=['#7B78FF','#DCD03A','#45BE85','#FF8A7A','#5EC8F2','#E58CFF'];
 // ---------- avatar builder: stored in avatar_icon as "b" + 7 base36 digits ----------
 const AB={
@@ -462,7 +464,7 @@ async function drawMyPhotos(){
   box.innerHTML = list.map(r=>`<div style="width:96px"><button data-view="${esc(urls[r.path]||'')}" data-path="${esc(r.path)}" style="all:unset;cursor:pointer;display:block;width:96px;height:120px;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line)">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button><p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p>${r.status==='approved'?(S.profile.avatar_photo===r.path?`<button class="back small" data-unav="1" style="font-size:12px;min-height:28px;color:var(--gold)">★ Avatar · undo</button>`:`<button class="back small" data-av="${esc(r.path)}" style="font-size:12px;min-height:28px">Use as avatar</button>`):''}<button class="back small" data-mv="${r.id}" style="font-size:12px;min-height:28px">Move to 🔒</button><button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
     + (list.filter(r=>r.status!=='rejected').length<4 ? `<button class="chip" id="phadd" aria-label="Add a photo" style="width:96px;height:120px;border-radius:12px;font-size:30px">+</button>` : '');
   box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ if(b.dataset.view) photoViewer(b.dataset.view, b.dataset.path); });
-  box.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ if(!S.profile.verified) return toast('Verify your selfie first (Living Room) to use a private folder'); if(confirm('Move this photo to your private folder? Only friends you pick will see it.')) movePhoto(b.dataset.mv,true); });
+  box.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ if(!S.profile.verified) return needVerify('move photos into your private folder'); if(confirm('Move this photo to your private folder? Only friends you pick will see it.')) movePhoto(b.dataset.mv,true); });
   S.myAvatarUrl = S.profile.avatar_photo ? (urls[S.profile.avatar_photo]||null) : null;
   const avp=document.getElementById('avp'); if(avp&&S.myAvatarUrl) avp.innerHTML=photoAv(S.myAvatarUrl,64);
   const setAv=async path=>{ const { error } = await SB.from('profiles').update({ avatar_photo:path }).eq('id',S.user.id); if(error) return toast(error.message);
@@ -513,7 +515,7 @@ function cropPhoto(file){ return new Promise((res,rej)=>{
 async function uploadPhoto(f, priv){
   let b; try{ b=await cropPhoto(f); }catch(e){ return toast(e.message); } if(!b) return;
   priv=await chooseDest(!!priv); if(priv===null) return;
-  if(priv && !S.profile.verified) return toast('Verify your selfie first (Living Room) to use a private folder');
+  if(priv && !S.profile.verified) return needVerify('use a private folder');
   try{ toast('Uploading…');
     const path=S.user.id+'/'+(crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random().toString(36).slice(2))+'.jpg';
     const up=await SB.storage.from('photos').upload(path,b,{ contentType:'image/jpeg' }); if(up.error) throw up.error;
@@ -533,7 +535,7 @@ async function drawMyAlbum(){
   box.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ if(confirm('Make this photo public? MIRL checks it again first (no nudity in public photos). Then it can be your avatar.')) movePhoto(b.dataset.mv,false); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Remove this private photo?')) return;
     await SB.storage.from('photos').remove([b.dataset.path]); await SB.from('photos').delete().eq('id',b.dataset.del); drawMyAlbum(); });
-  const add=document.getElementById('pphadd'); if(add) add.onclick=()=>{ if(!S.profile.verified) return toast('Verify your selfie first (below)'); document.getElementById('pphf').click(); };
+  const add=document.getElementById('pphadd'); if(add) add.onclick=()=>{ if(!S.profile.verified) return needVerify('add private photos'); document.getElementById('pphf').click(); };
   const sh=document.getElementById('pshare'); const [{ data:fr }, { data:vw }] = await Promise.all([SB.rpc('my_friends'), SB.rpc('my_album_viewers')]); if(!document.body.contains(sh)) return;
   const on=new Set(vw||[]);
   sh.innerHTML=(fr||[]).length ? fr.map(f=>`<div class="item" style="cursor:default">${av(f.avatar_icon,f.avatar_color,36,'u:'+f.id)}<p style="flex:1;font-weight:600">@${esc(f.handle)}</p><button class="switch" role="switch" data-sh="${f.id}" aria-checked="${on.has(f.id)}" aria-label="Share private folder with @${esc(f.handle)}"></button></div>`).join('')
@@ -615,6 +617,21 @@ async function renderAdmin(){
         ${m.reports?`<p class="small" style="color:${m.under_review?'var(--red)':'var(--gold)'}">${m.reports} report${m.reports>1?'s':''}${m.under_review?' · hidden, under review':''}</p>`:''}</div></div>`).join('')
       :'<p class="small muted">No one matches.</p>'; };
   draw(); document.getElementById('aq').oninput=e=>draw(e.target.value);
+}
+// friendly "get verified first" sheet that takes you straight to the selfie step
+async function needVerify(what){
+  const { data:st } = await SB.rpc('my_verification');
+  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2600;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:20px;text-transform:none;letter-spacing:0;color:var(--ink)">${st==='pending'?'⏳ Almost there':'Get your ✓ first'}</h2>
+    ${st==='pending'?`<p class="muted">Your selfie is waiting for MIRL to check it. Once you get your ✓ you can ${esc(what)}. We'll send you a notification.</p><button class="btn" data-x>OK</button>`
+    :`<p class="muted">To ${esc(what)}, MIRL needs to know you're a real adult and that it's really you. It takes about 30 seconds:</p>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px"><p>1️⃣ Have one approved photo in <b>My photos</b></p><p>2️⃣ Take a quick selfie doing the pose we show you</p><p>3️⃣ MIRL checks it, then you get a ✓</p></div>
+      <button class="btn gold" data-go>Verify now</button><button class="back" data-x>Not now</button>`}</div>`;
+  document.body.appendChild(d); const close=()=>d.remove(); d.onclick=e=>{ if(e.target===d) close(); };
+  d.querySelectorAll('[data-x]').forEach(b=>b.onclick=close);
+  const go=d.querySelector('[data-go]'); if(go) go.onclick=()=>{ close(); if(S.tab!=='me') setTab('me'); else if(!document.getElementById('vfy')) renderMe();
+    let n=0; const t=setInterval(()=>{ const v=document.getElementById('vfy'); if(v&&v.innerHTML.trim()){ clearInterval(t); v.scrollIntoView({behavior:'smooth',block:'center'}); v.style.transition='box-shadow .3s'; v.style.boxShadow='0 0 0 3px var(--gold)'; setTimeout(()=>v.style.boxShadow='',2500); } else if(++n>40) clearInterval(t); },150); };
 }
 async function drawVerifyQueue(){
   const box=document.getElementById('admv'); if(!box) return;
@@ -738,7 +755,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 // ---------- welcome / sign in ----------
 function renderWelcome(){
   $app.innerHTML = `<div class="screen hero">
-    <div class="logo">mirl</div>
+    <img class="brandlogo" src="/app/logo.png" alt="MIRL" style="width:190px;margin:0 0 6px -6px">
     <h1 style="font-size:40px">Meet in<br>real life.</h1>
     <p class="muted">See where your kind of people are going tonight, join a plan, or start your own. Launching first on Atlantic Ave in Delray Beach.</p>
     <div style="flex:1"></div>
@@ -804,7 +821,7 @@ async function renderMap(){
   let view=null; try{ view=JSON.parse(localStorage.getItem('mirl_view')||'null'); }catch{}
   const DELRAY=[26.4616,-80.0685];
   $app.innerHTML = `<div class="screen">
-    <div class="row between"><div><p class="small muted" id="area">Near you</p><h1>Tonight</h1></div>
+    <div class="row between"><div class="row" style="gap:12px"><img class="brandlogo" src="/app/logo.png" alt="MIRL" style="width:72px"><div><p class="small muted" id="area">Near you</p><h1>Tonight</h1></div></div>
       <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Friends can see your spot'}</span></div>
     <div id="feat"></div>
     <div style="position:relative">
@@ -1082,6 +1099,7 @@ async function openPlan(pid){
     <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
     ${mine?'<div class="row" style="gap:8px"><button class="btn violet" id="pc">💬 Plan chat</button><button class="btn" id="pi">+ Invite friends</button></div><button class="btn" id="lv">Not going anymore</button>':''}
     ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
+    ${p.host_id===S.user.id?`<button class="btn" id="cxl" style="color:var(--red);border-color:var(--red)">Cancel this plan</button>`:''}
     <h2>Who's going</h2>
     ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
       : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color,null,'u:'+g.id)}
@@ -1105,6 +1123,8 @@ async function openPlan(pid){
   const pi=document.getElementById('pi'); if(pi) pi.onclick=async()=>{ const r=await friendPicker('Invite friends', (going||[]).map(g=>g.id), 'Send invites'); if(!r||!r.ids.length) return;
     const { data:n, error } = await SB.rpc('invite_friends',{ pid, uids:r.ids }); if(error) return toast(error.message); toast(n?`Invited ${n} friend${n>1?'s':''}`:'They\'re already going'); };
   const lv=document.getElementById('lv'); if(lv) lv.onclick=async()=>{ await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); openPlan(pid); };
+  const cxl=document.getElementById('cxl'); if(cxl) cxl.onclick=async()=>{ if(!confirm('Cancel "'+p.title+'"? Everyone going gets told, and the plan chat closes. This can\'t be undone.')) return;
+    cxl.disabled=true; const { error } = await SB.rpc('cancel_plan',{ pid }); if(error){ cxl.disabled=false; return toast(error.message); } toast('Plan canceled. Everyone was told.'); refreshBadges(); setTab('plans'); };
   const cp=document.getElementById('cp'); if(cp) cp.onclick=async()=>{ const link=location.origin+location.pathname+'#join='+p.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } };
 }
 async function renderPlans(){
@@ -1194,7 +1214,7 @@ async function drawMeetInvites(){
   box.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>openPlan(b.dataset.pl));
 }
 async function meetSheet(o){ if(!o) return;
-  if(!S.profile.verified) return toast('Get your ✓ first (Living Room → Get verified) to send invites');
+  if(!S.profile.verified) return needVerify('send Meet invites');
   const { data:mine } = await SB.rpc('my_upcoming_plans'); const plans=mine||[];
   const def=new Date(); if(def.getHours()>=19) def.setDate(def.getDate()+1); def.setHours(20,0,0,0);
   const local=new Date(def-def.getTimezoneOffset()*6e4).toISOString().slice(0,16);
@@ -1433,6 +1453,7 @@ function renderMe(needHandle){
     <div id="ph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
     <input type="file" id="phf" accept="image/*" hidden>
     <h2>🔒 Private folder</h2>
+    ${p.verified?'':'<div class="card row between" style="border-color:var(--gold);gap:10px"><p class="small"><b>Step 1:</b> get your ✓ to unlock your private folder.</p><button class="btn sm gold" id="pvgo" style="width:auto;flex-shrink:0">Verify</button></div>'}
     <p class="small muted" style="margin-bottom:10px">Up to 12 photos plus a hidden bio. Spicy is OK. MIRL only checks it's legal: it's you (or you have their OK), everyone's an adult. Only the friends you pick below can see it, and you can take it back any time. Needs a verified selfie.</p>
     <label class="f">Hidden bio <span class="small muted">· only for friends you share with</span><textarea id="pbio" maxlength="500" rows="3" placeholder="The stuff you only tell people you trust.">${esc(p.private_bio||'')}</textarea></label>
     <div id="pph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
@@ -1474,6 +1495,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
   wireId(ist);
+  document.getElementById('pvgo')?.addEventListener('click',()=>needVerify('use a private folder'));
   drawMyPhotos(); drawMyAlbum(); drawBlocks(); drawReview(); drawNotify(); drawVerify(); drawDiscreet();
   document.getElementById('myfr').onclick=renderFriends;
   const links=(Array.isArray(p.links)?p.links:[]).map(l=>({...l}));
