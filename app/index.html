@@ -629,7 +629,9 @@ async function refreshBadges(){ clearTimeout(bdgT); bdgT=setTimeout(async()=>{ i
   const { data } = await SB.rpc('my_badges'); const b=(data||[])[0]||{};
   [['chats',b.chats],['plans',b.plans]].forEach(([t,n])=>{ const btn=document.querySelector(`nav.tabs button[data-tab=${t}]`); if(!btn) return;
     let el=btn.querySelector('.bdg'); if(!n){ el?.remove(); return; } if(!el){ el=document.createElement('span'); el.className='bdg'; btn.appendChild(el); } el.textContent=n>99?'99+':n; });
-  if(navigator.setAppBadge){ try{ b.chats?navigator.setAppBadge(b.chats):navigator.clearAppBadge(); }catch{} } },150); }
+  const n=(b.chats||0)+(b.plans||0);
+  if(navigator.setAppBadge){ try{ n?navigator.setAppBadge(n):navigator.clearAppBadge(); }catch{} }
+  try{ const c=await caches.open('mirl-badge'); await c.put('/app/badge-count', new Response(String(n))); }catch{} },150); }
 setInterval(()=>{ if(document.visibilityState==='visible') refreshBadges(); }, 45000);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshBadges(); });
 
@@ -915,6 +917,7 @@ function newPlan(vid, vname){
     <label class="f">When<input type="datetime-local" id="wh" value="${local}"></label>
     <div class="seg" style="grid-template-columns:1fr 1fr" id="vis"><button aria-pressed="true" data-v="open">Open to members</button><button aria-pressed="false" data-v="invite">Invite-only</button></div>
     <p class="small muted" id="vnote">Shows on the map to members who fit your settings.</p>
+    <div id="tagw" hidden><p style="font-weight:600;margin-bottom:6px">Tag friends <span class="small muted" style="font-weight:400">· they get an invite</span></p><div class="chips" id="tagf"></div></div>
     <div class="err" id="err"></div>
     <button class="btn violet" id="go">Post plan</button>
     <p class="small muted">Public venues only. Hosts follow the same 18+, block and report rules.</p>
@@ -942,6 +945,10 @@ function newPlan(vid, vname){
         if(!out.length){ sug.innerHTML='<p class="small muted">No matches yet. Keep typing, or add the spot from the map.</p>'; return; }
         show(out); },300); };
   }
+  const tagged=new Set();
+  SB.rpc('my_friends').then(({data})=>{ const w=document.getElementById('tagw'), c=document.getElementById('tagf'); if(!w||!(data||[]).length) return; w.hidden=false;
+    c.innerHTML=data.map(f=>`<button class="chip" aria-pressed="false" data-f="${f.id}">@${esc(f.handle)}</button>`).join('');
+    c.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ const on=!tagged.has(b.dataset.f); on?tagged.add(b.dataset.f):tagged.delete(b.dataset.f); b.setAttribute('aria-pressed',on); }); });
   document.querySelectorAll('#vis button').forEach(b=>b.onclick=()=>{ vis=b.dataset.v; document.querySelectorAll('#vis button').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('vnote').textContent = vis==='open'?'Shows on the map to members who fit your settings.':'Only people you send the link to can see and join.'; });
   document.getElementById('go').onclick=async()=>{
     const err=document.getElementById('err'); const title=document.getElementById('ti').value.trim();
@@ -953,6 +960,7 @@ function newPlan(vid, vname){
     const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis }).select('id,invite_code').single();
     if(error) return err.textContent='Could not post: '+error.message;
     await SB.from('plan_members').upsert({ plan_id:data.id, user_id:S.user.id, friends:0 });
+    if(tagged.size){ const { data:n } = await SB.rpc('invite_friends',{ pid:data.id, uids:[...tagged] }); if(n) toast(`Invited ${n} friend${n>1?'s':''}`); }
     if(vis==='invite'){ const link=location.origin+location.pathname+'#join='+data.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } }
     else toast('Plan posted');
     openPlan(data.id);
@@ -972,7 +980,7 @@ async function openPlan(pid){
     <div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm violet" id="pl" aria-label="One more friend">+</button></div></div>
     <p class="small muted">Bring up to 4 friends.</p>
     <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
-    ${mine?'<button class="btn" id="lv">Not going anymore</button>':''}
+    ${mine?'<div class="row" style="gap:8px"><button class="btn violet" id="pc">💬 Plan chat</button><button class="btn" id="pi">+ Invite friends</button></div><button class="btn" id="lv">Not going anymore</button>':''}
     ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
     <h2>Who's going</h2>
     ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
@@ -993,6 +1001,9 @@ async function openPlan(pid){
   document.getElementById('mi').onclick=()=>{ friends=Math.max(0,friends-1); document.getElementById('gl').textContent=label(); };
   document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
   document.getElementById('go').onclick=async()=>{ const { error } = await SB.from('plan_members').upsert({ plan_id:pid, user_id:S.user.id, friends }); if(error) return toast(error.message); toast("You're going"); openPlan(pid); };
+  const pc=document.getElementById('pc'); if(pc) pc.onclick=()=>openPlanChat(pid);
+  const pi=document.getElementById('pi'); if(pi) pi.onclick=async()=>{ const r=await friendPicker('Invite friends', (going||[]).map(g=>g.id), 'Send invites'); if(!r||!r.ids.length) return;
+    const { data:n, error } = await SB.rpc('invite_friends',{ pid, uids:r.ids }); if(error) return toast(error.message); toast(n?`Invited ${n} friend${n>1?'s':''}`:'They\'re already going'); };
   const lv=document.getElementById('lv'); if(lv) lv.onclick=async()=>{ await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); openPlan(pid); };
   const cp=document.getElementById('cp'); if(cp) cp.onclick=async()=>{ const link=location.origin+location.pathname+'#join='+p.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } };
 }
@@ -1001,11 +1012,18 @@ async function renderPlans(){
   const list=(mine||[]).filter(m=>m.plans && new Date(m.plans.starts_at) > Date.now()-6*36e5).sort((a,b)=>new Date(a.plans.starts_at)-new Date(b.plans.starts_at));
   $app.innerHTML = `<div class="screen">
     <div class="row between"><h1>My plans</h1><button class="btn gold sm" id="np">+ New plan</button></div>
-    <div class="list">${list.length? list.map(m=>{const p=m.plans,w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${esc(p.venues?.name)} · ${m.friends?'you + '+m.friends:'just you'}</p></div></button>`}).join('') : '<p class="muted">No plans yet. Pick a spot on the map, or start one.</p>'}</div>
+    <div id="pinv"></div>
+    <div class="list" id="plist">${list.length? list.map(m=>{const p=m.plans,w=when(p.starts_at); return `<button class="item" data-id="${p.id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(p.title)}</p><p class="small muted">${esc(p.venues?.name)} · ${m.friends?'you + '+m.friends:'just you'}</p></div></button>`}).join('') : '<p class="muted">No plans yet. Pick a spot on the map, or start one.</p>'}</div>
     ${S.profile.founding_member?'<div class="card"><p style="font-weight:600;color:var(--violet)">★ Founding Member</p><p class="small muted">You joined before launch. This badge is yours for good.</p></div>':''}
   </div>`;
   document.getElementById('np').onclick=()=>newPlan(null);
-  document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+  document.querySelectorAll('#plist .item').forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+  const { data:inv } = await SB.rpc('my_plan_invites'); const box=document.getElementById('pinv'); if(!box||!(inv||[]).length) return;
+  box.innerHTML=`<h2>You're invited</h2><div class="list">${inv.map(i=>{ const w=when(i.starts_at); return `<div class="item" style="cursor:default"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(i.title)}</p><p class="small muted">${esc(i.venue||'')} · from @${esc(i.invited_by)}</p></div>
+    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm gold" data-yes="${i.plan_id}" style="width:auto">Join</button><button class="back small" data-no="${i.plan_id}" style="font-size:12px">No thanks</button></div></div>`; }).join('')}</div>`;
+  box.querySelectorAll('[data-yes],[data-no]').forEach(b=>b.onclick=async()=>{ const pid=b.dataset.yes||b.dataset.no, ok=!!b.dataset.yes; b.disabled=true;
+    const { error } = await SB.rpc('answer_plan_invite',{ pid, ok }); if(error){ b.disabled=false; return toast(error.message); }
+    refreshBadges(); if(ok){ toast("You're going"); openPlan(pid); } else renderPlans(); });
 }
 
 // ---------- chats ----------
@@ -1016,10 +1034,18 @@ async function renderChats(){
       <div class="row" style="gap:8px;margin-top:8px"><input type="text" id="fh" placeholder="@handle" maxlength="21" autocapitalize="none" autocomplete="off" style="flex:1"><button class="btn sm gold" id="fsend" style="width:auto">Send</button></div>
       <p class="small muted" id="fmsg" style="margin-top:6px">Ask them for their exact handle. You're friends once they accept. Yours is <b style="color:var(--ink)">@${esc(S.profile.handle||'')}</b>.</p></div>
     <div id="freqs"></div>
-    <div class="list">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
+    <div class="row between" style="margin-top:4px"><h2 style="margin:0">Groups</h2><button class="btn sm violet" id="ng" style="width:auto">+ New group</button></div>
+    <div class="list" id="glist"><p class="small muted">Loading…</p></div>
+    <h2>Chats</h2>
+    <div class="list" id="clist">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
       return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span><span data-vb="c:${c.id}"></span></p>
       <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h if quiet · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here. It stays open as long as you keep talking, and disappears after 14 quiet hours unless you both tap Add friend.</p>'}</div></div>`;
-  document.querySelectorAll('.list .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
+  document.querySelectorAll('#clist .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
+  document.getElementById('ng').onclick=newGroup;
+  SB.rpc('my_groups').then(({data})=>{ const gl=document.getElementById('glist'); if(!gl) return; const gs=data||[];
+    gl.innerHTML=gs.length?gs.map(g=>`<button class="item" data-g="${g.id}"><div class="avatar" style="width:48px;height:48px;background:${g.is_plan?'var(--gold)':'var(--violet)'};font-size:22px">${g.is_plan?'📅':'👥'}</div><div style="flex:1;min-width:0"><p style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</p><p class="small muted">${g.is_plan?'Plan chat · ':''}${g.members} ${g.members===1?'person':'people'}</p></div>${g.unread?`<span class="ubdg">${g.unread}</span>`:''}</button>`).join('')
+      :'<p class="small muted">Start a group with friends. Everyone going to a plan also gets a plan chat here.</p>';
+    gl.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGroup(b.dataset.g)); });
   const send=async()=>{ const h=document.getElementById('fh').value.trim().replace(/^@/,'').toLowerCase(); const m=document.getElementById('fmsg');
     if(!HANDLE_RE.test(h)) { m.textContent='Handles are 3–20 letters, numbers, _ or .'; m.style.color='var(--gold)'; return; }
     if(h===S.profile.handle){ m.textContent="That's you!"; return; }
@@ -1100,6 +1126,83 @@ async function openChat(cid){
     toast('Blocked. Thanks for telling us.'); setTab('chats');
   };
 }
+
+// ---------- groups: friend groups + plan chats ----------
+function friendPicker(title, skip, okText, extra){ return new Promise(async res=>{
+  const { data } = await SB.rpc('my_friends'); const fr=(data||[]).filter(f=>!(skip||[]).includes(f.id)); const sel=new Set();
+  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+    <div class="row between"><h2 style="margin:0">${esc(title)}</h2><button class="back" data-x aria-label="Close">✕</button></div>${extra||''}
+    ${fr.length?`<div class="list">${fr.map(f=>`<button class="item" data-f="${f.id}">${av(f.avatar_icon,f.avatar_color,40)}<p style="flex:1;font-weight:600">@${esc(f.handle)}</p><span class="ck" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:700"></span></button>`).join('')}</div>`
+      :'<p class="muted">No friends to add yet. Add friends by handle in Chats, or tap Add friend in a chat.</p>'}
+    <p class="err" data-err></p><button class="btn violet" data-ok>${esc(okText||'Done')}</button></div>`;
+  document.body.appendChild(d); const close=v=>{ d.remove(); res(v); };
+  d.querySelector('[data-x]').onclick=()=>close(null); d.onclick=e=>{ if(e.target===d) close(null); };
+  d.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ const id=b.dataset.f, ck=b.querySelector('.ck'); if(sel.has(id)){ sel.delete(id); ck.textContent=''; ck.style.background=''; ck.style.borderColor=''; } else { sel.add(id); ck.textContent='✓'; ck.style.background='var(--violet)'; ck.style.borderColor='var(--violet)'; ck.style.color='var(--bg)'; } });
+  d.querySelector('[data-ok]').onclick=()=>{ const nm=d.querySelector('#gnm'); if(nm && nm.value.trim().length<1){ d.querySelector('[data-err]').textContent='Give the group a name.'; return; }
+    if(nm && !sel.size){ d.querySelector('[data-err]').textContent='Pick at least one friend.'; return; } close({ ids:[...sel], name:nm?nm.value.trim():null }); };
+}); }
+async function newGroup(){
+  const r=await friendPicker('New group', [], 'Create group', '<label class="f">Group name<input type="text" id="gnm" maxlength="60" placeholder="Saturday crew"></label><p class="small muted" style="margin-top:-6px">Pick friends to add:</p>');
+  if(!r) return; const { data:gid, error } = await SB.rpc('create_group',{ p_name:r.name, uids:r.ids }); if(error) return toast(error.message); openGroup(gid);
+}
+async function openGroup(gid){
+  const [{ data:g }, { data:people }, { data:msgs }, { data:rx }] = await Promise.all([
+    SB.from('groups').select('id,name,plan_id').eq('id',gid).maybeSingle(), SB.rpc('group_people',{ gid }),
+    SB.from('group_messages').select('*').eq('group_id',gid).order('created_at').limit(500), SB.from('group_reactions').select('message_id,user_id,emoji').eq('group_id',gid)]);
+  if(!g){ toast('That group is gone'); return setTab('chats'); }
+  const P=new Map((people||[]).map(p=>[p.id,p])), M=new Map((msgs||[]).map(m=>[m.id,m])), R=new Map(); let replyTo=null;
+  (rx||[]).forEach(r=>{ if(!R.has(r.message_id)) R.set(r.message_id,new Map()); R.get(r.message_id).set(r.user_id,r.emoji); });
+  const who=id=>id===S.user.id?'You':'@'+(P.get(id)?.handle||'member');
+  const snip=t=>(t||'').length>70?t.slice(0,70)+'…':(t||'');
+  const msgHTML=(m,prev)=>{ const q=m.reply_to&&M.get(m.reply_to), rs=R.get(m.id), me=m.sender===S.user.id, p=P.get(m.sender);
+    const counts={}; let mine=null; if(rs) rs.forEach((e,u)=>{ counts[e]=(counts[e]||0)+1; if(u===S.user.id) mine=e; });
+    const head=!me && (!prev || prev.sender!==m.sender);
+    return `<div class="msg ${me?'me':''}" data-id="${m.id}" data-s="${m.sender}">${head?`<div class="row" style="gap:6px;margin:0 4px 3px">${av(p?.avatar_icon,p?.avatar_color,22,'u:'+m.sender)}<span class="small muted">${esc(who(m.sender))}</span></div>`:''}${q?`<div class="quote">↩ ${esc(who(q.sender))}: ${esc(snip(q.body))}</div>`:''}<div class="bubble ${me?'me':''}">${esc(m.body)}</div>${Object.keys(counts).length?`<div class="rx">${REACTS.filter(e=>counts[e]).map(e=>`<span class="${mine===e?'mine':''}">${e}${counts[e]>1?' '+counts[e]:''}</span>`).join('')}</div>`:''}</div>`; };
+  const all=msgs||[];
+  $app.innerHTML = `<div class="screen">
+    <div class="row between"><button class="back" id="bk">‹ Chats</button><div class="row" style="gap:6px">${g.plan_id?'<button class="btn sm" id="gp" style="width:auto">📅 Plan</button>':'<button class="btn sm violet" id="ga" style="width:auto">+ Add</button>'}${g.plan_id?'':'<button class="btn sm" id="gx" style="width:auto">Leave</button>'}</div></div>
+    <div><h1 style="margin-bottom:4px">${g.plan_id?'📅 ':'👥 '}${esc(g.name)}</h1><p class="small muted" id="gpl">${(people||[]).map(p=>p.id===S.user.id?'you':'@'+esc(p.handle)).join(', ')}</p>${g.plan_id?'<p class="small muted">Everyone going is in this chat. It closes a day after the plan.</p>':''}</div>
+    <div id="msgs" style="display:flex;flex-direction:column;gap:10px">${all.map((m,i)=>msgHTML(m,all[i-1])).join('')||'<p class="small muted" id="nomsg">Kick it off. Where are we meeting?</p>'}</div>
+    <p class="small muted" style="text-align:center">Tap a message to react or reply</p>
+    <div id="rbar" class="row between" hidden style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 10px"><p class="small" id="rtext" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p><button class="back small" id="rx" aria-label="Cancel reply">✕</button></div>
+    <div class="row"><input type="text" id="tx" maxlength="1000" placeholder="Message the group"><button class="btn sm violet" id="sd">Send</button></div>
+  </div>`;
+  document.getElementById('bk').onclick=()=>setTab('chats');
+  const gp=document.getElementById('gp'); if(gp) gp.onclick=()=>openPlan(g.plan_id);
+  const ga=document.getElementById('ga'); if(ga) ga.onclick=async()=>{ const r=await friendPicker('Add to '+g.name, [...P.keys()], 'Add'); if(!r||!r.ids.length) return;
+    const { error } = await SB.rpc('add_to_group',{ gid, uids:r.ids }); if(error) return toast(error.message); toast('Added'); openGroup(gid); };
+  const gx=document.getElementById('gx'); if(gx) gx.onclick=async()=>{ if(!confirm('Leave '+g.name+'?')) return;
+    const { error } = await SB.rpc('leave_group',{ gid }); if(error) return toast(error.message); toast('You left the group'); setTab('chats'); };
+  const box=document.getElementById('msgs');
+  const addMsg=m=>{ if(!document.body.contains(box) || box.querySelector(`[data-id="${m.id}"]`)) return; document.getElementById('nomsg')?.remove();
+    const last=[...box.querySelectorAll('.msg')].pop(); M.set(m.id,m); box.insertAdjacentHTML('beforeend', msgHTML(m, last?{sender:last.dataset.s}:null)); box.lastElementChild.scrollIntoView({block:'end',behavior:'smooth'});
+    if(!P.has(m.sender)) SB.rpc('group_people',{ gid }).then(({data})=>(data||[]).forEach(p=>P.set(p.id,p))); };
+  const redraw=id=>{ const el=box.querySelector(`.msg[data-id="${id}"]`), m=M.get(id); if(el&&m){ const open=!!el.querySelector('.mbar'), prev=el.previousElementSibling; el.outerHTML=msgHTML(m, prev&&prev.dataset.s?{sender:prev.dataset.s}:null); if(open) openBar(id); } };
+  const setReact=(id,u,e)=>{ if(!R.has(id)) R.set(id,new Map()); if(e) R.get(id).set(u,e); else R.get(id).delete(u); redraw(id); };
+  const openBar=id=>{ box.querySelectorAll('.mbar').forEach(x=>x.remove()); const el=box.querySelector(`.msg[data-id="${id}"]`); if(!el) return;
+    el.insertAdjacentHTML('beforeend', `<div class="mbar">${REACTS.map(e=>`<button data-r="${e}" aria-label="React ${e}">${e}</button>`).join('')}<button class="rp" data-reply="1">↩ Reply</button></div>`); };
+  box.onclick=async e=>{ const msgEl=e.target.closest('.msg'); if(!msgEl) return; const id=msgEl.dataset.id;
+    const rb=e.target.closest('[data-r]'), rp=e.target.closest('[data-reply]');
+    if(rp){ replyTo=id; const m=M.get(id); document.getElementById('rtext').textContent='↩ Replying to '+who(m?.sender)+': '+snip(m?.body); document.getElementById('rbar').hidden=false; msgEl.querySelector('.mbar')?.remove(); document.getElementById('tx').focus(); return; }
+    if(rb){ const emo=rb.dataset.r, mine=R.get(id)?.get(S.user.id); msgEl.querySelector('.mbar')?.remove();
+      if(mine===emo){ setReact(id,S.user.id,null); const { error } = await SB.from('group_reactions').delete().eq('message_id',id).eq('user_id',S.user.id); if(error){ setReact(id,S.user.id,mine); toast(error.message); } }
+      else { setReact(id,S.user.id,emo); const { error } = await SB.from('group_reactions').upsert({ message_id:id, user_id:S.user.id, group_id:gid, emoji:emo }); if(error){ setReact(id,S.user.id,mine||null); toast(error.message); } }
+      return; }
+    if(e.target.closest('.bubble')){ if(msgEl.querySelector('.mbar')) msgEl.querySelector('.mbar').remove(); else openBar(id); } };
+  document.getElementById('rx').onclick=()=>{ replyTo=null; document.getElementById('rbar').hidden=true; };
+  box.lastElementChild?.scrollIntoView({block:'end'});
+  SB.rpc('mark_group_read',{ gid }).then(refreshBadges);
+  if(S.chan) SB.removeChannel(S.chan);
+  S.chan = SB.channel('group-'+gid)
+    .on('postgres_changes',{ event:'INSERT', schema:'public', table:'group_messages', filter:'group_id=eq.'+gid }, p=>{ addMsg(p.new); if(p.new.sender!==S.user.id) SB.rpc('mark_group_read',{ gid }); })
+    .on('postgres_changes',{ event:'*', schema:'public', table:'group_reactions', filter:'group_id=eq.'+gid }, p=>{ const r=p.eventType==='DELETE'?p.old:p.new; if(!r||!r.message_id||r.user_id===S.user.id) return; setReact(r.message_id, r.user_id, p.eventType==='DELETE'?null:r.emoji); })
+    .subscribe();
+  const send=async()=>{ const tx=document.getElementById('tx'); const body=tx.value.trim(); if(!body) return; tx.value=''; const rt=replyTo; replyTo=null; document.getElementById('rbar').hidden=true;
+    const { data, error } = await SB.from('group_messages').insert({ group_id:gid, sender:S.user.id, body, reply_to:rt }).select().single(); if(error){ tx.value=body; return toast(error.message); } addMsg(data); tx.focus(); };
+  document.getElementById('sd').onclick=send; document.getElementById('tx').onkeydown=e=>{ if(e.key==='Enter') send(); };
+}
+async function openPlanChat(pid){ const { data } = await SB.rpc('my_groups'); const g=(data||[]).find(x=>x.plan_id===pid); if(!g) return toast('RSVP to join the plan chat'); openGroup(g.id); }
 
 // ---------- me / living room ----------
 function renderMe(needHandle){
