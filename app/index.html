@@ -1061,7 +1061,7 @@ async function renderChats(){
   fr.querySelectorAll('[data-acc],[data-dec]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.acc; const { data:cid, error } = await SB.rpc('answer_friend_request',{ sender:b.dataset.acc||b.dataset.dec, ok });
     if(error) return toast(error.message); if(ok&&cid){ toast("You're friends now"); openChat(cid); } else renderChats(); });
 }
-const REACTS=['👍','👎','❤️','‼️'];
+const REACTS=['👍','👎','❤️','😂','‼️'];
 async function openChat(cid){
   const [{ data:msgs }, { data:rx }] = await Promise.all([SB.from('messages').select('*').eq('connection_id',cid).order('created_at'), SB.from('message_reactions').select('message_id,user_id,emoji').eq('connection_id',cid)]);
   const M=new Map((msgs||[]).map(m=>[m.id,m])), R=new Map(); let replyTo=null;
