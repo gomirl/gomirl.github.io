@@ -257,7 +257,7 @@ async function renderMap(){
     if(feat && feat[0]){ const f=feat[0], w=when(f.starts_at);
       featEl.innerHTML=`<button class="item" style="background:var(--gold);color:var(--bg);border-color:var(--gold)" id="featb">
         <div class="date" style="color:var(--bg)"><span>${w.day}</span><b>${w.time}</b></div>
-        <div style="flex:1"><p class="small" style="font-weight:600;letter-spacing:.06em">THIS WEEK'S MIRL NIGHT</p><p style="font-family:var(--display);font-size:19px;font-weight:700">${esc(f.title)}</p><p class="small">${esc(f.venue)} · ${f.going} going</p></div></button>`;
+        <div style="flex:1"><p class="small" style="font-weight:600;letter-spacing:.06em">MOST POPULAR PLAN NEARBY</p><p style="font-family:var(--display);font-size:19px;font-weight:700">${esc(f.title)}</p><p class="small">${esc(f.venue)} · ${f.going} going</p></div></button>`;
       document.getElementById('featb').onclick=()=>openPlan(f.plan_id);
     } else featEl.innerHTML='';
     layer.clearLayers();
@@ -366,13 +366,24 @@ async function openVenue(id){
   document.getElementById('ci').onclick=()=>{
     const err=document.getElementById('err'); err.textContent='Checking your location…';
     if(!navigator.geolocation) return err.textContent='Location is not available on this device.';
-    navigator.geolocation.getCurrentPosition(async pos=>{
+    const iOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+    const fail=e=>{
+      if(e.code===1) err.innerHTML = iOS
+        ? 'Location is blocked for this browser. On iPhone: <b>Settings → Privacy & Security → Location Services</b> (on) → <b>Safari Websites</b> (or Chrome) → <b>While Using</b>. Then reload this page and tap check in again.'
+        : 'Location is blocked. Tap the lock icon by the web address, allow Location, then tap check in again.';
+      else err.textContent='Could not get your location (weak signal indoors?). Step near a door or window and tap check in again.';
+    };
+    const go=async pos=>{
       const d=dist(pos.coords.latitude,pos.coords.longitude,v.lat,v.lng);
-      if(d > CHECKIN_RADIUS_M + Math.min(pos.coords.accuracy||0,100)) return err.textContent=`You look about ${Math.round(d)} m away. Check in once you're inside.`;
+      if(d > CHECKIN_RADIUS_M + Math.min(pos.coords.accuracy||0,150)) return err.textContent=`You look about ${Math.round(d)} m away. Check in once you're inside.`;
       const { error } = await SB.rpc('check_in',{ venue: vid });
       if(error) return err.textContent='Could not check in: '+error.message;
       err.textContent=''; toast('Checked in'); openInside(vid, v.name);
-    }, ()=>{ err.textContent='Allow location to check in. MIRL only asks when you tap this button.'; }, { enableHighAccuracy:true, timeout:10000 });
+    };
+    navigator.geolocation.getCurrentPosition(go, e=>{
+      if(e.code===1) return fail(e);
+      navigator.geolocation.getCurrentPosition(go, fail, { enableHighAccuracy:false, timeout:20000, maximumAge:120000 });  // retry, faster/coarser
+    }, { enableHighAccuracy:true, timeout:12000, maximumAge:60000 });
   };
 }
 
