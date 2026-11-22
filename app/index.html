@@ -398,6 +398,31 @@ async function uploadPhoto(f){
     toast('Sent to MIRL for approval'); drawMyPhotos(); markReview();
   }catch(e){ toast(e.message||'Upload failed. Try again.'); }
 }
+// ---------- admin: members & stats (Nicole only; the server checks too) ----------
+const ago=t=>{ if(!t) return 'never'; const m=Math.round((Date.now()-new Date(t))/6e4); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'; };
+async function renderAdmin(){
+  if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
+  $app.innerHTML=`<div class="screen"><button class="back" id="bk">‹ Living Room</button><h1>Members</h1>
+    <div id="ast"><p class="small muted">Loading…</p></div>
+    <input type="text" id="aq" placeholder="Search handle, name or email" autocomplete="off" style="margin:14px 0 10px">
+    <div class="list" id="al"></div></div>`;
+  document.getElementById('bk').onclick=()=>setTab('me');
+  const [{ data:st, error:e1 }, { data:ms, error:e2 }] = await Promise.all([SB.rpc('admin_stats'), SB.rpc('admin_members')]);
+  const ast=document.getElementById('ast'); if(!ast) return;
+  if(e1||e2) return ast.innerHTML=`<p class="err">${esc((e1||e2).message)}</p>`;
+  const t=st[0]||{}, tile=(n,l)=>`<div class="card" style="margin:0;padding:12px"><p style="font:700 24px var(--display)">${n??0}</p><p class="small muted">${l}</p></div>`;
+  ast.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${tile(t.members,'Members')}${tile(t.new_7d,'New this week')}${tile(t.active_24h,'Active today')}${tile(t.active_7d,'Active this week')}${tile(t.checkins_today,'Check-ins today')}${tile(t.waitlist,'Waitlist (imported)')}${tile(t.photos_pending,'Photos to approve')}${tile(t.open_reports,'Open reports')}</div>`;
+  const list=ms||[], al=document.getElementById('al');
+  const draw=q=>{ q=(q||'').toLowerCase(); const f=list.filter(m=>!q||[m.handle,m.first_name,m.email].some(x=>(x||'').toLowerCase().includes(q)));
+    al.innerHTML=f.length?f.map(m=>`<div class="item" style="cursor:default;align-items:flex-start">${av(m.avatar_icon,m.avatar_color,null,'u:'+m.id)}
+      <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(m.handle||'no handle yet')}${m.verified?' <span style="color:var(--green)">✓</span>':''}${m.founding?' <span style="color:var(--violet)">★</span>':''}</p>
+        <p class="small">${esc(m.first_name||'')}${m.age?', '+m.age:''}${m.gender?' · '+esc(m.gender):''} · ${esc(m.mode||'')}</p>
+        <p class="small muted">Joined ${new Date(m.joined).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · seen ${ago(m.last_seen)} · ${m.checkins} check-in${m.checkins===1?'':'s'} · ${m.photos} photo${m.photos===1?'':'s'}</p>
+        <p class="small muted" style="word-break:break-all">${esc(m.email||'')}</p>
+        ${m.reports?`<p class="small" style="color:${m.under_review?'var(--red)':'var(--gold)'}">${m.reports} report${m.reports>1?'s':''}${m.under_review?' · hidden, under review':''}</p>`:''}</div></div>`).join('')
+      :'<p class="small muted">No one matches.</p>'; };
+  draw(); document.getElementById('aq').oninput=e=>draw(e.target.value);
+}
 async function drawVerifyQueue(){
   const box=document.getElementById('admv'); if(!box) return;
   const { data } = await SB.rpc('pending_verifications'); const list=data||[];
@@ -962,7 +987,7 @@ function renderMe(needHandle){
     <h2>Get verified</h2>
     <div class="card" id="vfy"></div>
     <input type="file" id="vff" accept="image/*" capture="user" hidden>
-    ${S.user.id===ADMIN_ID?'<div id="adm"></div><div id="admv"></div>':''}
+    ${S.user.id===ADMIN_ID?'<button class="btn violet" id="admbtn" style="margin-top:16px">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>':''}
     <h2>I'm looking for</h2>
     <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
     <h2>Tap what you're into</h2>
@@ -992,6 +1017,7 @@ function renderMe(needHandle){
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
   wireId(ist);
   drawMyPhotos(); drawReview(); drawNotify(); drawVerify();
+  document.getElementById('admbtn')?.addEventListener('click', renderAdmin);
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
   document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
   document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
