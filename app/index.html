@@ -23,6 +23,8 @@
 :root{--bg:#12101C;--surface:#1D1A2B;--surface2:#272338;--line:#2F2A44;--ink:#F4F1FA;--muted:#B4ADC8;--gold:#DCD03A;--violet:#7B78FF;--green:#45BE85;--red:#FF8A7A;
 --display:'Space Grotesk',system-ui,sans-serif;--body:Inter,system-ui,-apple-system,sans-serif;color-scheme:dark}
 *{box-sizing:border-box}
+img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
+[data-view],[data-u],.avatar,.pv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 #app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
@@ -419,21 +421,47 @@ async function autoPing(){ try{ if(!S.profile||S.profile.share_activity===false|
 setInterval(()=>{ if(document.visibilityState==='visible') autoPing(); }, 10*60e3);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') autoPing(); });
 async function signedUrls(paths){ const m={}; if(!paths.length) return m;
-  const { data } = await SB.storage.from('photos').createSignedUrls(paths, 3600); (data||[]).forEach(d=>{ if(d.signedUrl) m[d.path]=d.signedUrl; }); return m; }
+  const { data } = await SB.storage.from('photos').createSignedUrls(paths, 900); (data||[]).forEach(d=>{ if(d.signedUrl) m[d.path]=d.signedUrl; }); return m; }
 function shrinkPhoto(file, q){ return new Promise((res,rej)=>{ const img=new Image();
   img.onload=()=>{ const k=Math.min(1,1080/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(img.src); c.toBlob(b=>b?res(b):rej(new Error('Could not read that photo')),'image/jpeg',q||0.82); };
   img.onerror=()=>rej(new Error('That file is not a photo we can read. Try a JPG or PNG.')); img.src=URL.createObjectURL(file); }); }
-function photoViewer(url){ const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px';
-  d.innerHTML=`<img src="${esc(url)}" style="max-width:100%;max-height:100%;border-radius:12px" alt="">`; d.onclick=()=>d.remove(); document.body.appendChild(d); }
+const PREACTS=['❤️','🔥','😍','😂','👍'];
+function photoViewer(url, path){ const d=document.createElement('div'); d.className='pv'; d.style.cssText='position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.94);padding:16px';
+  const own=path&&S.user&&path.startsWith(S.user.id+'/');
+  d.innerHTML=`<div class="pv" style="position:absolute;inset:16px 16px 120px;background:url('${esc(url)}') center/contain no-repeat"></div>
+    <div style="position:absolute;left:0;right:0;bottom:max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px">
+      ${path?'<div id="prx" style="display:flex;gap:6px;background:rgba(255,255,255,.08);border-radius:24px;padding:4px 8px"></div>':''}
+      <p class="small" style="text-align:center;color:rgba(255,255,255,.55);margin:0">Viewed by @${esc(S.profile?.handle||'member')} · tap photo to close</p></div>`;
+  d.onclick=e=>{ if(!e.target.closest('#prx')) d.remove(); }; document.body.appendChild(d);
+  if(!path) return; const bar=d.querySelector('#prx'); bar.onclick=e=>e.stopPropagation(); let C={}, mine=null;
+  const draw=()=>{ bar.innerHTML=PREACTS.map(e=>`<button data-e="${e}" ${own?'disabled':''} aria-label="React ${e}" style="all:unset;cursor:${own?'default':'pointer'};font-size:22px;padding:4px 6px;border-radius:16px;${mine===e?'background:rgba(123,120,255,.45)':''};color:#fff">${e}${C[e]?`<span style="font-size:13px;margin-left:2px">${C[e]}</span>`:''}</button>`).join('')
+      + (own&&!Object.keys(C).length?'<span class="small" style="color:rgba(255,255,255,.6);padding:6px">No reactions yet</span>':'');
+    bar.querySelectorAll('[data-e]').forEach(b=>b.onclick=async()=>{ if(own) return; const e=b.dataset.e, prev=mine;
+      if(prev) C[prev]=(C[prev]||1)-1; if(prev&&!C[prev]) delete C[prev]; mine = prev===e?null:e; if(mine) C[mine]=(C[mine]||0)+1; draw();
+      const { error } = await SB.rpc('react_photo',{ p_path:path, p_emoji:mine }); if(error) toast(error.message); }); };
+  draw(); SB.rpc('photo_reaction_counts',{ paths:[path] }).then(({data})=>{ C={}; (data||[]).forEach(r=>{ C[r.emoji]=r.n; if(r.mine) mine=r.emoji; }); draw(); }); }
+// pick public or private after cropping
+function chooseDest(priv){ return new Promise(res=>{ const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2600;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px">
+    <h2 style="margin:0">Where should this photo go?</h2>
+    <button class="btn ${priv?'':'gold'}" data-d="pub" style="display:block;text-align:left;padding:12px 16px">🌞 Public photos<br><span class="small" style="font-weight:400">Shows in chats. Can be your avatar. No nudity.</span></button>
+    <button class="btn ${priv?'violet':''}" data-d="priv" style="display:block;text-align:left;padding:12px 16px">🔒 Private folder<br><span class="small" style="font-weight:400">Only friends you pick. Spicy OK.</span></button>
+    <button class="back" data-d="x">Cancel</button></div>`;
+  document.body.appendChild(d); d.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ d.remove(); res(b.dataset.d==='x'?null:b.dataset.d==='priv'); }); }); }
+async function movePhoto(id, toPriv){ const { data, error } = await SB.rpc('move_photo',{ pid:id, to_private:toPriv }); if(error) return toast(error.message);
+  toast(toPriv?'Moved to your private folder':'Moved to public. MIRL will check it first.'); drawMyPhotos(); drawMyAlbum(); markReview(); }
+// no save / copy / share menus on photos
+['contextmenu','dragstart','selectstart'].forEach(t=>document.addEventListener(t,e=>{ if(e.target.closest&&e.target.closest('img,[data-view],[data-u],.avatar,.pv')) e.preventDefault(); }));
 async function drawMyPhotos(){
   const box=document.getElementById('ph'); if(!box) return;
   const { data:rows } = await SB.from('photos').select('id,path,status,private').order('created_at'); const list=(rows||[]).filter(r=>!r.private);
   const urls=await signedUrls(list.map(r=>r.path)); if(!document.body.contains(box)) return;
   const lab={pending:'Waiting for approval',approved:'Approved',rejected:'Not approved'}, col={pending:'var(--gold)',approved:'var(--green)',rejected:'var(--red)'};
-  box.innerHTML = list.map(r=>`<div style="width:96px"><button data-view="${esc(urls[r.path]||'')}" style="all:unset;cursor:pointer;display:block;width:96px;height:120px;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line)">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button><p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p>${r.status==='approved'?(S.profile.avatar_photo===r.path?`<button class="back small" data-unav="1" style="font-size:12px;min-height:28px;color:var(--gold)">★ Avatar · undo</button>`:`<button class="back small" data-av="${esc(r.path)}" style="font-size:12px;min-height:28px">Use as avatar</button>`):''}<button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
+  box.innerHTML = list.map(r=>`<div style="width:96px"><button data-view="${esc(urls[r.path]||'')}" data-path="${esc(r.path)}" style="all:unset;cursor:pointer;display:block;width:96px;height:120px;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line)">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button><p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p>${r.status==='approved'?(S.profile.avatar_photo===r.path?`<button class="back small" data-unav="1" style="font-size:12px;min-height:28px;color:var(--gold)">★ Avatar · undo</button>`:`<button class="back small" data-av="${esc(r.path)}" style="font-size:12px;min-height:28px">Use as avatar</button>`):''}<button class="back small" data-mv="${r.id}" style="font-size:12px;min-height:28px">Move to 🔒</button><button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
     + (list.filter(r=>r.status!=='rejected').length<4 ? `<button class="chip" id="phadd" aria-label="Add a photo" style="width:96px;height:120px;border-radius:12px;font-size:30px">+</button>` : '');
-  box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ if(b.dataset.view) photoViewer(b.dataset.view); });
+  box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ if(b.dataset.view) photoViewer(b.dataset.view, b.dataset.path); });
+  box.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ if(!S.profile.verified) return toast('Verify your selfie first (Living Room) to use a private folder'); if(confirm('Move this photo to your private folder? Only friends you pick will see it.')) movePhoto(b.dataset.mv,true); });
   S.myAvatarUrl = S.profile.avatar_photo ? (urls[S.profile.avatar_photo]||null) : null;
   const avp=document.getElementById('avp'); if(avp&&S.myAvatarUrl) avp.innerHTML=photoAv(S.myAvatarUrl,64);
   const setAv=async path=>{ const { error } = await SB.from('profiles').update({ avatar_photo:path }).eq('id',S.user.id); if(error) return toast(error.message);
@@ -483,6 +511,8 @@ function cropPhoto(file){ return new Promise((res,rej)=>{
   img.src=url; }); }
 async function uploadPhoto(f, priv){
   let b; try{ b=await cropPhoto(f); }catch(e){ return toast(e.message); } if(!b) return;
+  priv=await chooseDest(!!priv); if(priv===null) return;
+  if(priv && !S.profile.verified) return toast('Verify your selfie first (Living Room) to use a private folder');
   try{ toast('Uploading…');
     const path=S.user.id+'/'+(crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random().toString(36).slice(2))+'.jpg';
     const up=await SB.storage.from('photos').upload(path,b,{ contentType:'image/jpeg' }); if(up.error) throw up.error;
@@ -490,15 +520,16 @@ async function uploadPhoto(f, priv){
     toast('Sent to MIRL for approval'); priv?drawMyAlbum():drawMyPhotos(); markReview();
   }catch(e){ toast(e.message||'Upload failed. Try again.'); }
 }
-const blurTile=(url,w,h)=>`<button data-view="${esc(url)}" style="all:unset;cursor:pointer;position:relative;flex-shrink:0;width:${w}px;height:${h}px;border-radius:12px;overflow:hidden;background:var(--surface)"><img src="${esc(url)}" alt="" style="width:100%;height:100%;object-fit:cover;filter:blur(18px);transform:scale(1.15)"><span class="small" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:600;text-shadow:0 1px 4px #000">🔒 Tap</span></button>`;
+const blurTile=(url,w,h,path)=>`<button data-view="${esc(url)}" data-path="${esc(path||'')}" style="all:unset;cursor:pointer;position:relative;flex-shrink:0;width:${w}px;height:${h}px;border-radius:12px;overflow:hidden;background:var(--surface)"><img src="${esc(url)}" alt="" style="width:100%;height:100%;object-fit:cover;filter:blur(18px);transform:scale(1.15)"><span class="small" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:600;text-shadow:0 1px 4px #000">🔒 Tap</span></button>`;
 async function drawMyAlbum(){
   const box=document.getElementById('pph'); if(!box) return;
   const { data:rows } = await SB.from('photos').select('id,path,status,private').order('created_at'); const list=(rows||[]).filter(r=>r.private);
   const urls=await signedUrls(list.map(r=>r.path)); if(!document.body.contains(box)) return;
   const lab={pending:'Waiting for approval',approved:'Approved',rejected:'Not approved'}, col={pending:'var(--gold)',approved:'var(--green)',rejected:'var(--red)'};
-  box.innerHTML = list.map(r=>`<div style="width:96px">${urls[r.path]?blurTile(urls[r.path],96,120):'<div style="width:96px;height:120px;border-radius:12px;background:var(--surface)"></div>'}<p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p><button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
+  box.innerHTML = list.map(r=>`<div style="width:96px">${urls[r.path]?blurTile(urls[r.path],96,120,r.path):'<div style="width:96px;height:120px;border-radius:12px;background:var(--surface)"></div>'}<p class="small" style="color:${col[r.status]};margin:4px 0 0;line-height:1.2">${lab[r.status]}</p><button class="back small" data-mv="${r.id}" style="font-size:12px;min-height:28px">Make public</button><button class="back small" data-del="${r.id}" data-path="${esc(r.path)}" style="font-size:12px;min-height:28px">Remove</button></div>`).join('')
     + (list.filter(r=>r.status!=='rejected').length<12 ? `<button class="chip" id="pphadd" aria-label="Add a private photo" style="width:96px;height:120px;border-radius:12px;font-size:30px">+</button>` : '');
-  box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>photoViewer(b.dataset.view));
+  box.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>photoViewer(b.dataset.view, b.dataset.path));
+  box.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ if(confirm('Make this photo public? MIRL checks it again first (no nudity in public photos). Then it can be your avatar.')) movePhoto(b.dataset.mv,false); });
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(!confirm('Remove this private photo?')) return;
     await SB.storage.from('photos').remove([b.dataset.path]); await SB.from('photos').delete().eq('id',b.dataset.del); drawMyAlbum(); });
   const add=document.getElementById('pphadd'); if(add) add.onclick=()=>{ if(!S.profile.verified) return toast('Verify your selfie first (below)'); document.getElementById('pphf').click(); };
@@ -531,8 +562,8 @@ async function openFriend(uid, back){
     ${links.length?`<div class="list">${links.map(l=>`<a class="item" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer nofollow" style="text-decoration:none"><span style="font-size:20px">🔗</span><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(l.label)}</p><p class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(host(l.url))}</p></div><span class="muted">↗</span></a>`).join('')}</div>`:''}
     ${shared.length||other.length?`<h2>Interests</h2>${shared.length?`<p class="small" style="color:var(--violet);margin-bottom:6px">${shared.length} in common</p>`:''}<div class="chips">${shared.map(i=>`<span class="chip" aria-pressed="true" style="display:inline-flex;align-items:center">${esc(i)}</span>`).join('')}${other.map(i=>`<span class="chip" style="display:inline-flex;align-items:center">${esc(i)}</span>`).join('')}</div>`:''}
     ${(f.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${f.shared_desires.map(esc).join(', ')}</p>`:''}
-    ${(pub||[]).filter(x=>urls[x]).length?`<h2>Photos</h2><div class="row" style="gap:8px;overflow-x:auto">${pub.filter(x=>urls[x]).map(x=>`<button data-view="${esc(urls[x])}" style="all:unset;cursor:pointer;flex-shrink:0;width:96px;height:120px;border-radius:12px;overflow:hidden"><img src="${esc(urls[x])}" alt="" style="width:100%;height:100%;object-fit:cover"></button>`).join('')}</div>`:''}
-    ${f.album_count||f.private_bio?`<h2>🔒 Shared with you</h2>${f.private_bio?`<div class="card" style="border-color:var(--violet)"><p style="white-space:pre-wrap">${esc(f.private_bio)}</p></div>`:''}<div class="row" style="gap:8px;overflow-x:auto">${(alb||[]).filter(x=>urls[x]).map(x=>blurTile(urls[x],96,120)).join('')}</div><p class="small muted">Shared just with you. Don't screenshot or pass it on.</p>`:''}
+    ${(pub||[]).filter(x=>urls[x]).length?`<h2>Photos</h2><div class="row" style="gap:8px;overflow-x:auto">${pub.filter(x=>urls[x]).map(x=>`<button data-view="${esc(urls[x])}" data-path="${esc(x)}" style="all:unset;cursor:pointer;flex-shrink:0;width:96px;height:120px;border-radius:12px;overflow:hidden"><img src="${esc(urls[x])}" alt="" style="width:100%;height:100%;object-fit:cover"></button>`).join('')}</div>`:''}
+    ${f.album_count||f.private_bio?`<h2>🔒 Shared with you</h2>${f.private_bio?`<div class="card" style="border-color:var(--violet)"><p style="white-space:pre-wrap">${esc(f.private_bio)}</p></div>`:''}<div class="row" style="gap:8px;overflow-x:auto">${(alb||[]).filter(x=>urls[x]).map(x=>blurTile(urls[x],96,120,x)).join('')}</div><p class="small muted">Shared just with you. Don't screenshot or pass it on.</p>`:''}
     ${(plans||[]).length?`<h2>Plans together</h2><div class="list">${plans.map(pl=>{ const w=when(pl.starts_at); return `<button class="item" data-pl="${pl.plan_id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1"><p style="font-weight:600">${esc(pl.title)}</p><p class="small muted">${esc(pl.venue||'')}</p></div></button>`; }).join('')}</div>`:''}
     <h2>Actions</h2>
     <button class="btn violet" id="fmsg">💬 Message</button>
@@ -541,7 +572,7 @@ async function openFriend(uid, back){
     <button class="btn" id="frep" style="color:var(--red)">Block or report</button>
   </div>`;
   document.getElementById('bk').onclick=()=>back?back():setTab(S.tab);
-  $app.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>photoViewer(b.dataset.view));
+  $app.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>photoViewer(b.dataset.view, b.dataset.path));
   $app.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>openPlan(b.dataset.pl));
   document.getElementById('fmsg').onclick=()=>openChat(f.cid);
   const fsh=document.getElementById('fsh'); if(fsh) fsh.onclick=async()=>{ const want=fsh.getAttribute('aria-checked')!=='true'; fsh.setAttribute('aria-checked',want);
@@ -1155,8 +1186,8 @@ async function openChat(cid){
       hd.onclick=()=>openFriend(other, ()=>openChat(cid)); });
     const { data:paths } = await SB.rpc('their_photos',{ other }); const urls=await signedUrls(paths||[]);
     const box=document.getElementById('cph'); if(!box||!(paths||[]).length) return;
-    box.innerHTML=paths.filter(x=>urls[x]).map(x=>`<button data-u="${esc(urls[x])}" style="all:unset;cursor:pointer;flex-shrink:0;width:72px;height:90px;border-radius:10px;overflow:hidden"><img src="${esc(urls[x])}" alt="Their photo" style="width:100%;height:100%;object-fit:cover"></button>`).join(''); box.hidden=false;
-    box.querySelectorAll('button').forEach(b=>b.onclick=()=>photoViewer(b.dataset.u)); });
+    box.innerHTML=paths.filter(x=>urls[x]).map(x=>`<button data-u="${esc(urls[x])}" data-path="${esc(x)}" style="all:unset;cursor:pointer;flex-shrink:0;width:72px;height:90px;border-radius:10px;overflow:hidden"><img src="${esc(urls[x])}" alt="Their photo" style="width:100%;height:100%;object-fit:cover"></button>`).join(''); box.hidden=false;
+    box.querySelectorAll('button').forEach(b=>b.onclick=()=>photoViewer(b.dataset.u, b.dataset.path)); });
   kp.onclick=async()=>{ const { error } = await SB.rpc('keep_connection',{ cid }); if(error) return toast(error.message);
     const { data } = await SB.from('connections').select('user_a,kept_a,kept_b').eq('id',cid).maybeSingle(); kpState(data);
     toast(data&&data.kept_a&&data.kept_b ? "You're friends now. This chat stays." : "Friend request sent. You'll be friends when they add you too."); };
