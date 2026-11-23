@@ -779,7 +779,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 // ---------- welcome / sign in ----------
 function renderWelcome(){
   $app.innerHTML = `<div class="screen hero">
-    <img class="brandlogo" src="/app/logo.png" alt="MIRL" style="width:190px;margin:0 0 6px -6px">
+    <img class="brandlogo" src="/app/logo.png?v=2" alt="MIRL" style="width:200px;margin:0 0 6px -6px">
     <h1 style="font-size:40px">Meet in<br>real life.</h1>
     <p class="muted">See where people are going tonight. Join a plan or start your own. Starting on Atlantic Ave, Delray Beach.</p>
     <div style="flex:1"></div>
@@ -848,9 +848,11 @@ async function renderMap(){
   let view=null; try{ view=JSON.parse(localStorage.getItem('mirl_view')||'null'); }catch{}
   const DELRAY=[26.4616,-80.0685];
   $app.innerHTML = `<div class="screen">
-    <div class="row between"><div class="row" style="gap:12px"><img class="brandlogo" src="/app/logo.png" alt="MIRL" style="width:72px"><div><p class="small muted" id="area">Near you</p><h1>Tonight</h1></div></div>
+    <div class="row between"><div class="row" style="gap:12px"><img class="brandlogo" src="/app/logo.png?v=2" alt="MIRL" style="width:96px"><div><p class="small muted" id="area">Near you</p><h1>Tonight</h1></div></div>
       <span class="small muted">${S.profile.ghost_mode?'Ghost Mode on':'Friends can see your spot'}</span></div>
     <div id="feat"></div>
+    <div><input type="text" id="sq" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="🔎 Find a spot: bar, café, park…" aria-label="Find a spot" style="font-size:17px;border-color:var(--gold)">
+      <div id="ssug" class="list" style="margin-top:8px"></div></div>
     <div style="position:relative">
       <div id="map" role="region" aria-label="Map of spots"></div>
       <div id="xhair" hidden style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid var(--gold);border-radius:50%;z-index:900;pointer-events:none;box-shadow:0 0 0 3px rgba(0,0,0,.4)"></div>
@@ -927,6 +929,28 @@ async function renderMap(){
   };
   S.map.on('moveend',()=>{ clearTimeout(tmr); tmr=setTimeout(load,350); });
   load();
+  // find-a-spot box: instant matches from what's on the map, then MIRL + OpenStreetMap search
+  { const sq=document.getElementById('sq'), sg=document.getElementById('ssug'); let st, sseq=0;
+    const show=items=>{ sg.innerHTML=items.map((v,i)=>`<button class="item" data-i="${i}" style="padding:10px 12px"><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(v.name)}</p><p class="small muted">${esc([v.category,v.address].filter(Boolean).join(' · ')||'')}</p></div>${v.members_here?`<span class="small">${v.members_here} here</span>`:''}</button>`).join('');
+      sg.querySelectorAll('.item').forEach(b=>b.onclick=()=>{ const v=items[+b.dataset.i]; sq.value=''; sg.innerHTML=''; sq.blur(); if(v.lat&&v.lng) S.map.setView([v.lat,v.lng],17); goVenue(v); }); };
+    sq.oninput=()=>{ clearTimeout(st); const q=sq.value.trim().toLowerCase(); if(!q){ sg.innerHTML=''; return; }
+      const local=(S.venues||[]).filter(v=>v.name.toLowerCase().includes(q)).slice(0,6); show(local);
+      if(q.length<2) return;
+      st=setTimeout(async()=>{ const my=++sseq, c=S.map.getCenter();
+        const [loc, osm] = await Promise.all([
+          SB.rpc('search_venues',{ q, p_lat:c.lat, p_lng:c.lng }).then(r=>(r.data||[]).map(v=>({ venue_id:v.id, osm_id:v.osm_id, name:v.name, category:v.category, address:v.address, lat:v.lat, lng:v.lng, is_public:true }))).catch(()=>[]),
+          q.length<3 ? Promise.resolve([]) : fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${c.lat}&lon=${c.lng}&limit=8&lang=en`).then(r=>r.json()).then(j=>(j.features||[])
+            .filter(f=>f.properties.name && /^(amenity|leisure|tourism|shop|club|sport)$/.test(f.properties.osm_key))
+            .map(f=>({ venue_id:null, osm_id:String(f.properties.osm_type||'n').toLowerCase()[0]+f.properties.osm_id, name:f.properties.name, category:(f.properties.osm_value||'').replace(/_/g,' '),
+               address:[[f.properties.housenumber,f.properties.street].filter(Boolean).join(' '), f.properties.city].filter(Boolean).join(', ')||null, lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0], members_here:null, friends_here:0, is_public:true }))).catch(()=>[])
+        ]);
+        if(my!==sseq || sq.value.trim().toLowerCase()!==q) return;
+        const out=[...local];
+        const dup=v=>out.some(o=>(v.venue_id&&o.venue_id===v.venue_id)||(v.osm_id&&o.osm_id===v.osm_id)||(o.name.toLowerCase()===v.name.toLowerCase()&&Math.abs(o.lat-v.lat)<0.001&&Math.abs(o.lng-v.lng)<0.001));
+        loc.concat(osm).forEach(v=>{ if(!dup(v)) out.push(v); });
+        if(!out.length){ sg.innerHTML='<p class="small muted">No matches yet. Keep typing, or add it with "+ Add a missing spot".</p>'; return; }
+        show(out.slice(0,8)); },300); };
+  }
   document.getElementById('nearme').onclick=()=>{
     if(!navigator.geolocation) return toast('Location is not available on this device.');
     navigator.geolocation.getCurrentPosition(p=>{ pingArea(p); S.map.setView([p.coords.latitude,p.coords.longitude],16); }, ()=>toast('Allow location to center the map. It stays on your phone.'), { timeout:10000 });
