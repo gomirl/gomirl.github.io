@@ -28,17 +28,17 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 #app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
-.screen{flex:1;padding:max(24px,env(safe-area-inset-top)) 20px 110px;display:flex;flex-direction:column;gap:16px}
+.screen{flex:1;padding:max(24px,env(safe-area-inset-top)) 20px 120px;display:flex;flex-direction:column;gap:18px}
 h1{font-family:var(--display);font-weight:700;font-size:28px;margin:0;line-height:1.05}
 h2{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 0}
 p{margin:0;line-height:1.45}
-.muted{color:var(--muted)}.small{font-size:13px}
+.muted{color:var(--muted)}.small{font-size:14px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 18px;border-radius:25px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer;text-decoration:none;color:var(--ink);width:100%}
 .btn.gold{background:var(--gold);color:var(--bg);border-color:var(--gold)}
 .btn.violet{background:var(--violet);color:var(--bg);border-color:var(--violet)}
 .btn.white{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn.sm{min-height:40px;width:auto;padding:0 14px;font-size:14px}
+.btn.sm{min-height:44px;width:auto;padding:0 14px;font-size:14px}
 .btn:disabled{opacity:.5;cursor:default}
 label.f{display:grid;gap:6px;font-size:13px;color:var(--muted)}
 input[type=text],input[type=date],input[type=datetime-local],input[type=number],select,textarea{width:100%;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:10px 12px;color:var(--ink)}
@@ -47,7 +47,7 @@ input[type=text],input[type=date],input[type=datetime-local],input[type=number],
 .seg button,.chip{min-height:44px;border-radius:22px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer;padding:0 10px}
 .seg button[aria-pressed=true]{background:var(--violet);border-color:var(--violet);color:var(--bg)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{min-height:38px;font-weight:500}
+.chip{min-height:42px;font-weight:500}
 .chip[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:var(--bg)}
 .row{display:flex;align-items:center;gap:12px}
 .row.between{justify-content:space-between}
@@ -72,7 +72,7 @@ nav.tabs .bdg{position:absolute;top:2px;left:calc(50% + 6px);background:var(--re
 .pin.hot{background:var(--gold);color:var(--bg);border-color:var(--gold)}
 .pin.warm{background:var(--violet);color:var(--bg);border-color:var(--violet)}
 .list{display:flex;flex-direction:column;gap:10px}
-.item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
+.item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;min-height:56px;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
 .date{display:flex;flex-direction:column;align-items:center;width:44px;color:var(--gold);flex-shrink:0}
 .date b{font-family:var(--display);font-size:20px}
 .date span{font-size:11px;font-weight:600}
@@ -105,6 +105,23 @@ html.locked #app,html.locked nav.tabs{visibility:hidden}
 .mbar button{all:unset;cursor:pointer;font-size:22px;padding:2px 5px}
 .mbar button.rp{font-size:13px;font-weight:600;padding:4px 8px;border-left:1px solid var(--line);margin-left:4px}
 .hero{display:flex;flex-direction:column;gap:14px;padding-top:30px}
+.sheetbg{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:10px 18px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 4px}
+.tip{all:unset;cursor:pointer;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);color:var(--muted);font-size:12px;vertical-align:middle;margin-left:4px;text-transform:none;letter-spacing:0;font-weight:600}
+.navrow{min-height:64px}
+.navic{width:38px;height:38px;border-radius:12px;background:var(--surface2);display:grid;place-items:center;font-size:20px;flex-shrink:0}
+details.more{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+details.more[open]{display:flex;flex-direction:column;gap:12px}
+details.more summary{cursor:pointer;font-weight:600;list-style:none}
+details.more summary::after{content:" ▾";color:var(--muted)}
+.savebar{position:sticky;bottom:84px;padding-top:6px;background:linear-gradient(transparent,var(--bg) 30%)}
+.iconrow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.iconrow button{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:64px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer}
+.iconrow button span{font-size:22px}
+.back{min-height:40px}
+.seg button{position:relative}
+.tdot{position:absolute;top:6px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--red)}
 .brandlogo{display:block;height:auto;pointer-events:none}
 html.plain .brandlogo{display:none!important}
 .logo{font-family:var(--display);font-weight:700;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,#5E66FF,#8A2BFF);-webkit-background-clip:text;color:transparent}
@@ -282,8 +299,7 @@ async function fillBadges(){
 new MutationObserver(()=>{ clearTimeout(window.__apT); window.__apT=setTimeout(()=>{ fillAvatarPhotos(); fillBadges(); },60); }).observe(document.getElementById('app'),{ childList:true, subtree:true });
 const HANDLE_RE=/^[a-z0-9_.]{3,20}$/;
 function idBlock(h,icon,color){ return `
-    <h2>How you show up in the room</h2>
-    <p class="small muted">Inside a spot, people see only your avatar, handle and age. Your first name shows after you both say hi.</p>
+    <h2>How you show up ${tip('Inside a spot, people see only your avatar, handle and age.')}</h2>
     <div class="row">${'<span id="avp">'+av(icon,color,64)+'</span>'}<label class="f" style="flex:1">Handle<input type="text" id="hd" maxlength="20" value="${esc(h)}" autocapitalize="none" autocomplete="off" placeholder="letters, numbers, _ ."><span class="small" id="hdmsg">Lowercase letters, numbers, _ or . (3–20)</span></label></div>
     <button class="btn sm" id="avtog" style="width:auto;margin-top:8px">${h?'Change avatar ▾':'Hide avatar options ▴'}</button>
     <div id="avopts" ${h?'hidden':''}>
@@ -396,15 +412,15 @@ document.addEventListener('touchend',e=>tapHide(e.changedTouches[0].clientY),{pa
 document.addEventListener('dblclick',e=>{ if(lsGet('mirl_qhide')==='1'&&e.clientY<=90) showDecoy(); });
 async function drawDiscreet(){
   const box=document.getElementById('dsc'); if(!box) return; const L=getLock(), quiet=(S.profile.notify||{}).quiet===true, qh=lsGet('mirl_qhide')==='1', plain=lsGet('mirl_plain')==='1';
-  box.innerHTML=`<p class="small muted" style="margin-bottom:10px">For anyone who wants MIRL to stay private. These settings stay on this phone.</p>
+  box.innerHTML=`<p class="small muted" style="margin-bottom:10px">Keep MIRL private on this phone.</p>
     <div class="row between"><div><p style="font-weight:600">App lock</p><p class="small muted">${L?'On. A PIN is needed to open MIRL.':'Ask for a 4-digit PIN every time MIRL opens.'}</p></div>
       <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm ${L?'':'gold'}" id="dlk" style="width:auto">${L?'Change PIN':'Set PIN'}</button>${L?'<button class="back small" id="dlo" style="font-size:12px">Turn off</button>':''}</div></div>
     <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quiet notifications</p><p class="small muted">Alerts just say "New activity". No names, spots or messages.</p></div><button class="switch" id="dqn" role="switch" aria-checked="${quiet}" aria-label="Quiet notifications"></button></div>
-    <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quick hide</p><p class="small muted">Double-tap the top of the screen to cover MIRL with a plain Notes page. Hold "Notes" for a second to come back.</p></div><button class="switch" id="dqh" role="switch" aria-checked="${qh}" aria-label="Quick hide"></button></div>
+    <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Quick hide</p><p class="small muted">Double-tap the top to hide MIRL behind a Notes page.</p></div><button class="switch" id="dqh" role="switch" aria-checked="${qh}" aria-label="Quick hide"></button></div>
     <div class="row between" style="margin-top:14px"><div><p style="font-weight:600">Plain home-screen icon</p>
       <p class="small muted">${plain?'On: MIRL shows as <b>Hub</b> with a plain icon. iPhone only updates the icon when you add it, so delete MIRL from your home screen, then in Safari tap Share → Add to Home Screen.':'Shows MIRL as <b>Hub</b> with a plain icon instead of the MIRL logo.'}</p></div>
       <button class="switch" id="dpt" role="switch" aria-checked="${plain}" aria-label="Plain home-screen icon"></button></div>
-    <p class="small muted" style="margin-top:14px">More tips: keep Ghost Mode on, use a cartoon avatar instead of a photo, and sign in with a Google account only you use.</p>`;
+    `;
   document.getElementById('dlk').onclick=()=>setPin(drawDiscreet);
   document.getElementById('dlo')?.addEventListener('click',()=>{ const a=pinPad('Enter your PIN','To turn off app lock.', async(p,api)=>{ const L=getLock(); if(await sha(L.salt+p)!==L.hash) return api.fail('Wrong PIN'); lsSet('mirl_lock',null); api.close(); toast('App lock is off'); drawDiscreet(); }, true); });
   document.getElementById('dqn').onclick=async e=>{ const v=e.currentTarget.getAttribute('aria-checked')!=='true'; e.currentTarget.setAttribute('aria-checked',v);
@@ -445,8 +461,8 @@ function photoViewer(url, path){ const d=document.createElement('div'); d.classN
       const { error } = await SB.rpc('react_photo',{ p_path:path, p_emoji:mine }); if(error) toast(error.message); }); };
   draw(); SB.rpc('photo_reaction_counts',{ paths:[path] }).then(({data})=>{ C={}; (data||[]).forEach(r=>{ C[r.emoji]=r.n; if(r.mine) mine=r.emoji; }); draw(); }); }
 // pick public or private after cropping
-function chooseDest(priv){ return new Promise(res=>{ const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2600;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
-  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px">
+function chooseDest(priv){ return new Promise(res=>{ const d=document.createElement('div'); d.className='sheetbg';
+  d.innerHTML=`<div class="sheet"><div class="grab"></div>
     <h2 style="margin:0">Where should this photo go?</h2>
     <button class="btn ${priv?'':'gold'}" data-d="pub" style="display:block;text-align:left;padding:12px 16px">🌞 Public photos<br><span class="small" style="font-weight:400">Shows in chats. Can be your avatar. No nudity.</span></button>
     <button class="btn ${priv?'violet':''}" data-d="priv" style="display:block;text-align:left;padding:12px 16px">🔒 Private folder<br><span class="small" style="font-weight:400">Only friends you pick. Spicy OK.</span></button>
@@ -597,11 +613,11 @@ async function openFriend(uid, back){
 const ago=t=>{ if(!t) return 'never'; const m=Math.round((Date.now()-new Date(t))/6e4); return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'; };
 async function renderAdmin(){
   if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
-  $app.innerHTML=`<div class="screen"><button class="back" id="bk">‹ Living Room</button><h1>Members</h1>
+  $app.innerHTML=`<div class="screen"><button class="back" id="bk">‹ Admin</button><h1>Members</h1>
     <div id="ast"><p class="small muted">Loading…</p></div>
     <input type="text" id="aq" placeholder="Search handle, name or email" autocomplete="off" style="margin:14px 0 10px">
     <div class="list" id="al"></div></div>`;
-  document.getElementById('bk').onclick=()=>setTab('me');
+  document.getElementById('bk').onclick=renderAdminHub;
   const [{ data:st, error:e1 }, { data:ms, error:e2 }] = await Promise.all([SB.rpc('admin_stats'), SB.rpc('admin_members')]);
   const ast=document.getElementById('ast'); if(!ast) return;
   if(e1||e2) return ast.innerHTML=`<p class="err">${esc((e1||e2).message)}</p>`;
@@ -621,8 +637,8 @@ async function renderAdmin(){
 // friendly "get verified first" sheet that takes you straight to the selfie step
 async function needVerify(what){
   const { data:st } = await SB.rpc('my_verification');
-  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2600;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
-  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+  const d=document.createElement('div'); d.className='sheetbg';
+  d.innerHTML=`<div class="sheet"><div class="grab"></div>
     <h2 style="margin:0;font-size:20px;text-transform:none;letter-spacing:0;color:var(--ink)">${st==='pending'?'⏳ Almost there':'Get your ✓ first'}</h2>
     ${st==='pending'?`<p class="muted">Your selfie is waiting for MIRL to check it. Once you get your ✓ you can ${esc(what)}. We'll send you a notification.</p><button class="btn" data-x>OK</button>`
     :`<p class="muted">To ${esc(what)}, MIRL needs to know you're a real adult and that it's really you. It takes about 30 seconds:</p>
@@ -630,7 +646,7 @@ async function needVerify(what){
       <button class="btn gold" data-go>Verify now</button><button class="back" data-x>Not now</button>`}</div>`;
   document.body.appendChild(d); const close=()=>d.remove(); d.onclick=e=>{ if(e.target===d) close(); };
   d.querySelectorAll('[data-x]').forEach(b=>b.onclick=close);
-  const go=d.querySelector('[data-go]'); if(go) go.onclick=()=>{ close(); if(S.tab!=='me') setTab('me'); else if(!document.getElementById('vfy')) renderMe();
+  const go=d.querySelector('[data-go]'); if(go) go.onclick=()=>{ close(); if(S.tab!=='me') setTab('me'); renderPhotos();
     let n=0; const t=setInterval(()=>{ const v=document.getElementById('vfy'); if(v&&v.innerHTML.trim()){ clearInterval(t); v.scrollIntoView({behavior:'smooth',block:'center'}); v.style.transition='box-shadow .3s'; v.style.boxShadow='0 0 0 3px var(--gold)'; setTimeout(()=>v.style.boxShadow='',2500); } else if(++n>40) clearInterval(t); },150); };
 }
 async function drawVerifyQueue(){
@@ -673,6 +689,13 @@ async function markReview(){ if(S.user?.id!==ADMIN_ID) return; const [{ data }, 
   d.textContent=n; d.hidden=!n; }
 const $app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// one consistent bottom sheet for every pop-up
+function sheet(html, onClose){ const d=document.createElement('div'); d.className='sheetbg';
+  d.innerHTML=`<div class="sheet" role="dialog"><div class="grab"></div>${html}</div>`; document.body.appendChild(d);
+  const close=()=>{ d.remove(); onClose&&onClose(); }; d.onclick=e=>{ if(e.target===d) close(); }; d.querySelectorAll('[data-close]').forEach(b=>b.onclick=close); return { el:d.querySelector('.sheet'), close }; }
+// little ⓘ that explains on tap instead of paragraphs on screen
+const tip=t=>`<button type="button" class="tip" data-tip="${esc(t)}" aria-label="More info">ⓘ</button>`;
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('.tip'); if(!b) return; e.preventDefault(); e.stopPropagation(); sheet(`<p style="line-height:1.5">${esc(b.dataset.tip)}</p><button class="btn" data-close>Got it</button>`); }, true);
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 function dist(a,b,c,d){ const R=6371000,r=x=>x*Math.PI/180; const dl=r(c-a), dn=r(d-b); const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 function when(ts){ const d=new Date(ts); return { day:d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase(), time:d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(':00','').replace(' ','') }; }
@@ -710,7 +733,7 @@ async function drawNotify(){
     ? `<div class="row between"><p style="font-weight:600">Notifications on</p><button class="btn sm" id="ntest" style="width:auto">Send a test</button></div>
        ${NKINDS.map(([k,l])=>`<div class="row between" style="margin-top:10px"><p class="small">${l}</p><button class="switch" data-nk="${k}" role="switch" aria-checked="${pref[k]!==false}" aria-label="${esc(l)}"></button></div>`).join('')}
        <button class="back small" id="noff" style="margin-top:12px">Turn off on this phone</button>`
-    : `<p style="font-weight:600">Get a heads-up when a spot near you heats up</p><p class="small muted" style="margin:4px 0 10px">Also when someone says hi back, a friend goes out, or your plan is about to start. At most 2 "heating up" alerts a night, 6 PM to 1 AM.</p>`
+    : `<p style="font-weight:600">Get a heads-up when a spot near you heats up</p><p class="small muted" style="margin:4px 0 10px">Pick what pings you.</p>`
       + (Notification.permission==='denied' ? '<p class="small" style="color:var(--gold)">Notifications are blocked for MIRL in your phone settings. Turn them on there, then come back.</p>' : '<button class="btn gold" id="non">Turn on notifications</button>');
   document.getElementById('non')?.addEventListener('click', pushOn);
   document.getElementById('ntest')?.addEventListener('click', async()=>{ await SB.rpc('push_test'); toast('Test sent. It should pop up in a few seconds.'); });
@@ -757,7 +780,7 @@ function renderWelcome(){
   $app.innerHTML = `<div class="screen hero">
     <img class="brandlogo" src="/app/logo.png" alt="MIRL" style="width:190px;margin:0 0 6px -6px">
     <h1 style="font-size:40px">Meet in<br>real life.</h1>
-    <p class="muted">See where your kind of people are going tonight, join a plan, or start your own. Launching first on Atlantic Ave in Delray Beach.</p>
+    <p class="muted">See where people are going tonight. Join a plan or start your own. Starting on Atlantic Ave, Delray Beach.</p>
     <div style="flex:1"></div>
     <button class="btn white" id="g">Continue with Google</button>
     <p class="small muted" style="text-align:center">Facebook sign-in coming soon. Use Google for now.</p>
@@ -832,7 +855,7 @@ async function renderMap(){
       <div id="xhair" hidden style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border:3px solid var(--gold);border-radius:50%;z-index:900;pointer-events:none;box-shadow:0 0 0 3px rgba(0,0,0,.4)"></div>
       <button class="btn sm" id="nearme" style="position:absolute;right:10px;bottom:10px;z-index:900;background:var(--surface);width:auto">📍 Near me</button>
     </div>
-    <p class="small muted" id="mapmsg">Numbers only. Purple glow = 3+ members around with the app open. You see who's inside a spot once you're there too, and only as avatars and handles.</p>
+    <p class="small muted" id="mapmsg">Numbers = people at a spot. Purple glow = 3+ around. ${tip("You see who's inside a spot once you're there too, and only as avatars and handles.")}</p>
     <div id="addbox"></div>
     <button class="btn" id="addspot">+ Add a missing spot</button>
     <h2>Spots</h2><div class="list" id="vlist"><p class="small muted">Loading spots…</p></div>
@@ -1040,7 +1063,7 @@ function newPlan(vid, vname){
     <div id="tagw" hidden><p style="font-weight:600;margin-bottom:6px">Tag friends <span class="small muted" style="font-weight:400">· they get an invite</span></p><div class="chips" id="tagf"></div></div>
     <div class="err" id="err"></div>
     <button class="btn violet" id="go">Post plan</button>
-    <p class="small muted">Public venues only. Hosts follow the same 18+, block and report rules.</p>
+    
   </div>`;
   document.getElementById('bk').onclick=()=> vid?openVenue(vid):setTab('plans');
   let picked=null;
@@ -1087,31 +1110,29 @@ function newPlan(vid, vname){
   };
 }
 async function openPlan(pid){
+  if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
   const { data:p } = await SB.from('plans').select('id,title,starts_at,visibility,host_id,invite_code,venue_id,venues(name)').eq('id',pid).single();
   if(!p) return toast('Plan not found');
   const { data:mine } = await SB.from('plan_members').select('friends').eq('plan_id',pid).eq('user_id',S.user.id).maybeSingle();
   const [{ data:cnt }, { data:going }] = await Promise.all([SB.rpc('plan_count',{ pid }), mine ? SB.rpc('plan_going',{ pid }) : Promise.resolve({ data:[] })]);
-  let friends = mine?.friends||0; const w=when(p.starts_at);
+  let friends = mine?.friends||0; const w=when(p.starts_at), host=p.host_id===S.user.id;
   const label=()=>friends===0?'Just me':'Me + '+friends+(friends===1?' friend':' friends');
+  const dt=new Date(p.starts_at).toLocaleString('en-US',{ weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
   $app.innerHTML = `<div class="screen">
-    <button class="back" id="bk">‹ Back</button>
-    <div class="row"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div><h1>${esc(p.title)}</h1><p class="muted">${esc(p.venues?.name)} · ${p.visibility==='open'?'Open':'Invite-only'} · ${cnt||0} going</p></div></div>
-    <h2>Going as</h2>
-    <div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm violet" id="pl" aria-label="One more friend">+</button></div></div>
-    <p class="small muted">Bring up to 4 friends.</p>
-    <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
-    ${mine?`<button class="btn gold" id="psh">📲 Invite anyone</button><p class="small muted" style="margin-top:-8px">${(cnt||0)<3?"Plans with 3+ people get way more yes's. Invite a few friends?":"Send this plan by text, Instagram, anywhere. They can join even if they're not on MIRL yet."}</p>
-    <div class="row" style="gap:8px"><button class="btn violet" id="pc">💬 Plan chat</button><button class="btn" id="pi">+ Invite friends</button></div><button class="btn" id="lv">Not going anymore</button>`:''}
-    ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
-    ${p.host_id===S.user.id?`<button class="btn" id="cxl" style="color:var(--red);border-color:var(--red)">Cancel this plan</button>`:''}
-    <h2>Who's going</h2>
-    ${!mine ? '<div class="card"><p class="small muted">RSVP to see who else is going. Like inside a spot, you\'ll only see avatars, handles and ages, and only people who fit your settings.</p></div>'
+    <div class="row between"><button class="back" id="bk">‹ Back</button>${mine?'<button class="back" id="more" aria-label="More options" style="font-size:22px;padding:0 6px">⋯</button>':''}</div>
+    <div><h1>${esc(p.title)}</h1><p class="muted" style="margin-top:6px">📍 ${esc(p.venues?.name)}<br>🕗 ${esc(dt)}<br>👥 ${cnt||0} going${p.visibility==='open'?'':' · invite-only'}</p></div>
+    ${mine?`<div class="card row between"><p><b style="color:var(--green)">✓ You're going</b> <span class="muted">· ${label().toLowerCase()}</span></p></div>
+      <button class="btn gold" id="psh">📲 Invite anyone</button>
+      <div class="iconrow"><button id="pc"><span>💬</span>Plan chat</button><button id="pi"><span>👫</span>Friends</button><button id="pmore"><span>⋯</span>More</button></div>`
+    :`<div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm" id="pl" aria-label="One more friend">+</button></div></div>
+      <button class="btn gold" id="go">I'm going</button>`}
+    <h2>Who's going ${tip("You only see avatars, handles and ages, and only people who fit your settings. If you both say hi, a chat opens before you get there.")}</h2>
+    ${!mine ? '<p class="small muted">RSVP to see who else is going.</p>'
       : (going||[]).length ? `<div class="list" id="gw">${going.map(g=>`<div class="item" style="cursor:default">${av(g.avatar_icon,g.avatar_color,null,'u:'+g.id)}
-        <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}<span data-vb="u:${g.id}"></span>, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}${g.open_to_casual?' · Open to casual':''}</p>
-        <p class="small muted">${g.shared_interests?g.shared_interests+' shared interest'+(g.shared_interests>1?'s':''):''}</p></div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><button class="btn gold sm" data-id="${g.id}">Say hi</button><button class="back small" data-rep="${g.id}" style="font-size:12px">Report</button></div></div>`).join('')}</div>
-        <p class="small muted">If you both say hi, a chat opens before you get there.</p>`
-      : '<p class="small muted">Nobody else who fits your settings has RSVP\'d yet.</p>'}
+        <div style="flex:1;min-width:0"><p style="font-weight:600">@${esc(g.handle)}<span data-vb="u:${g.id}"></span>, ${g.age}${g.is_host?' · host':''}${g.friends?` · +${g.friends}`:''}</p>
+        <p class="small muted">${g.shared_interests?g.shared_interests+' in common':''}${g.open_to_casual?(g.shared_interests?' · ':'')+'open to casual':''}</p></div>
+        <button class="btn sm" data-id="${g.id}" style="width:auto">👋 Hi</button><button class="back" data-rep="${g.id}" aria-label="Report" style="padding:0 4px">⚑</button></div>`).join('')}</div>`
+      : '<p class="small muted">Nobody else yet. Invite someone!</p>'}
   </div>`;
   document.querySelectorAll('#gw button[data-rep]').forEach(b=>b.onclick=async()=>{ if(await reportPerson(b.dataset.rep,'plan')) openPlan(pid); });
   document.querySelectorAll('#gw button[data-id]').forEach(b=>b.onclick=async()=>{
@@ -1120,17 +1141,28 @@ async function openPlan(pid){
     b.textContent = data==='connected'?'Connected!':'Sent'; if(data==='connected') toast('You both said hi. Check Chats.');
   });
   document.getElementById('bk').onclick=()=>openVenue(p.venue_id);
-  document.getElementById('mi').onclick=()=>{ friends=Math.max(0,friends-1); document.getElementById('gl').textContent=label(); };
-  document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
-  document.getElementById('go').onclick=async()=>{ const { error } = await SB.from('plan_members').upsert({ plan_id:pid, user_id:S.user.id, friends }); if(error) return toast(error.message); toast("You're going"); openPlan(pid); };
-  const pc=document.getElementById('pc'); if(pc) pc.onclick=()=>openPlanChat(pid);
-  const psh=document.getElementById('psh'); if(psh) psh.onclick=()=>sharePlan(p);
-  const pi=document.getElementById('pi'); if(pi) pi.onclick=async()=>{ const r=await friendPicker('Invite friends', (going||[]).map(g=>g.id), 'Send invites'); if(!r||!r.ids.length) return;
+  const saveGoing=async()=>{ const { error } = await SB.from('plan_members').upsert({ plan_id:pid, user_id:S.user.id, friends }); if(error) return toast(error.message); toast("You're going"); refreshBadges(); openPlan(pid); };
+  if(!mine){ document.getElementById('mi').onclick=()=>{ friends=Math.max(0,friends-1); document.getElementById('gl').textContent=label(); };
+    document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
+    document.getElementById('go').onclick=saveGoing; return; }
+  document.getElementById('pc').onclick=()=>openPlanChat(pid);
+  document.getElementById('psh').onclick=()=>sharePlan(p);
+  document.getElementById('pi').onclick=async()=>{ const r=await friendPicker('Invite friends', (going||[]).map(g=>g.id), 'Send invites'); if(!r||!r.ids.length) return;
     const { data:n, error } = await SB.rpc('invite_friends',{ pid, uids:r.ids }); if(error) return toast(error.message); toast(n?`Invited ${n} friend${n>1?'s':''}`:'They\'re already going'); };
-  const lv=document.getElementById('lv'); if(lv) lv.onclick=async()=>{ await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); openPlan(pid); };
-  const cxl=document.getElementById('cxl'); if(cxl) cxl.onclick=async()=>{ if(!confirm('Cancel "'+p.title+'"? Everyone going gets told, and the plan chat closes. This can\'t be undone.')) return;
-    cxl.disabled=true; const { error } = await SB.rpc('cancel_plan',{ pid }); if(error){ cxl.disabled=false; return toast(error.message); } toast('Plan canceled. Everyone was told.'); refreshBadges(); setTab('plans'); };
-  const cp=document.getElementById('cp'); if(cp) cp.onclick=async()=>{ const link=location.origin+location.pathname+'#join='+p.invite_code; try{ await navigator.clipboard.writeText(link); toast('Invite link copied'); }catch{ prompt('Copy your invite link', link); } };
+  const moreSheet=()=>{ const sh=sheet(`<h2 style="margin:0">${esc(p.title)}</h2>
+      <div class="card row between"><b id="sgl">${label()}</b><div class="row"><button class="btn sm" id="smi" aria-label="One fewer friend">−</button><button class="btn sm" id="spl" aria-label="One more friend">+</button></div></div>
+      <button class="btn" id="ssv">Update how many I'm bringing</button>
+      <button class="btn" id="slv">Not going anymore</button>
+      ${host?'<button class="btn" id="scx" style="color:var(--red);border-color:var(--red)">Cancel this plan</button>':''}
+      <button class="back" data-close style="align-self:center">Close</button>`);
+    const q=x=>sh.el.querySelector(x);
+    q('#smi').onclick=()=>{ friends=Math.max(0,friends-1); q('#sgl').textContent=label(); };
+    q('#spl').onclick=()=>{ friends=Math.min(4,friends+1); q('#sgl').textContent=label(); };
+    q('#ssv').onclick=()=>{ sh.close(); saveGoing(); };
+    q('#slv').onclick=async()=>{ sh.close(); await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); refreshBadges(); openPlan(pid); };
+    const cx=q('#scx'); if(cx) cx.onclick=async()=>{ if(!confirm('Cancel "'+p.title+'"? Everyone going gets told, and the plan chat closes. This can\'t be undone.')) return;
+      sh.close(); const { error } = await SB.rpc('cancel_plan',{ pid }); if(error) return toast(error.message); toast('Plan canceled. Everyone was told.'); refreshBadges(); setTab('plans'); }; };
+  document.getElementById('pmore').onclick=moreSheet; document.getElementById('more').onclick=moreSheet;
 }
 async function renderPlans(){
   const { data:mine } = await SB.from('plan_members').select('friends, plans(id,title,starts_at,visibility,venues(name))').eq('user_id',S.user.id);
@@ -1160,8 +1192,8 @@ async function renderDiscover(){
   if(!p.discoverable){
     $app.innerHTML=`<div class="screen"><h1>Discover</h1>
       <div class="card"><p style="font-weight:600;font-size:18px">Find people to actually meet 🧭</p>
-      <p class="small muted" style="margin:8px 0 12px">Browse members nearby who want to date or make friends, then send a <b style="color:var(--ink)">Meet invite</b>: a spot, a time and a short note. If they say yes, a chat opens and it goes on both your plans.</p>
-      <p class="small muted" style="margin-bottom:12px">You only show up here if you turn it on. People see your avatar, handle, age, bio and shared interests, plus a rough distance. Never your name, photos or exact location.</p>
+      <p class="small muted" style="margin:8px 0 12px">See who nearby wants to date or make friends. Send a <b style="color:var(--ink)">Meet invite</b>: a spot, a time, a note.</p>
+      <p class="small muted" style="margin-bottom:12px">Only if you turn it on. ${tip('People see your avatar, handle, age, bio, shared interests and a rough distance. Never your name, photos or exact location.')}</p>
       <button class="btn gold" id="don">Show me in Discover</button><p class="err" id="derr"></p></div>
       <div id="dplans"></div></div>`;
     document.getElementById('don').onclick=async()=>{ const e=document.getElementById('derr'); e.textContent='';
@@ -1197,7 +1229,7 @@ async function renderDiscover(){
       ${o.bio?`<p class="small" style="margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(o.bio)}</p>`:''}
       ${o.shared?`<p class="small" style="color:var(--violet);margin-top:4px">${o.shared} in common: ${o.shared_list.slice(0,3).map(esc).join(', ')}${o.shared>3?'…':''}</p>`:''}</div>
       <button class="btn sm ${o.invited?'':'gold'}" data-inv="${o.id}" style="width:auto;flex-shrink:0" ${o.invited?'disabled':''}>${o.invited?'Invited ✓':'Invite'}</button></div>`).join('')
-    : `<p class="small muted">Nobody nearby in ${DSC.mode==='dating'?'Dating':'Friends'} yet. Try a bigger distance, switch modes, or check back. Invite your friends to join MIRL!</p>`;
+    : `<p class="small muted">Nobody nearby yet. Try a bigger distance or check back soon.</p>`;
   box.querySelectorAll('[data-inv]').forEach(b=>b.onclick=()=>meetSheet((ppl||[]).find(o=>o.id===b.dataset.inv)));
   const pb=document.getElementById('dplans'); if(pb) pb.innerHTML=(pl||[]).length?pl.map(x=>{ const w=when(x.starts_at); return `<button class="item" data-pl="${x.plan_id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(x.title)}</p><p class="small muted">${esc(x.venue)} · ~${x.miles} mi · ${x.going} going${x.im_going?' · <span style="color:var(--green)">you ✓</span>':''}</p></div></button>`; }).join('')
     : '<p class="small muted">No open plans nearby this week. Start one from Plans!</p>';
@@ -1224,8 +1256,8 @@ async function meetSheet(o){ if(!o) return;
   const def=new Date(); if(def.getHours()>=19) def.setDate(def.getDate()+1); def.setHours(20,0,0,0);
   const local=new Date(def-def.getTimezoneOffset()*6e4).toISOString().slice(0,16);
   let mode=plans.length?'plan':'new', planId=null, venue=null;
-  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
-  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+  const d=document.createElement('div'); d.className='sheetbg';
+  d.innerHTML=`<div class="sheet"><div class="grab"></div>
     <div class="row between"><h2 style="margin:0">Invite @${esc(o.handle)} to meet</h2><button class="back" data-x aria-label="Close">✕</button></div>
     ${plans.length?`<div class="seg" style="grid-template-columns:1fr 1fr" id="mk"><button data-k="plan" aria-pressed="true">One of my plans</button><button data-k="new" aria-pressed="false">New meet-up</button></div>`:''}
     <div id="mplan" ${plans.length?'':'hidden'}><div class="list">${plans.map(x=>{ const w=when(x.starts_at); return `<button class="item" data-p="${x.plan_id}"><div class="date"><span>${w.day}</span><b>${w.time}</b></div><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(x.title)}</p><p class="small muted">${esc(x.venue)}</p></div><span class="ck" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--line)"></span></button>`; }).join('')}</div></div>
@@ -1234,7 +1266,7 @@ async function meetSheet(o){ if(!o) return;
       <div class="list" id="msug" style="gap:6px;margin-top:-6px"></div><p class="small" id="mpick" style="color:var(--green)"></p>
       <label class="f">When<input type="datetime-local" id="mwh" value="${local}"></label></div>
     <label class="f">Note <span class="small muted">· optional</span><input type="text" id="mnote" maxlength="140" placeholder="${DSC.mode==='dating'?'Drinks and trivia? I\'ll be the one losing 😅':'Want to check out the live music?'}"></label>
-    <p class="small muted">They'll see your avatar, handle, age, bio and this invite. If they say no, you won't be told. You can send 5 a day.</p>
+    <p class="small muted">If they say no, you won't be told. ${tip("They see your avatar, handle, age, bio and this invite. You can send 5 a day.")}</p>
     <p class="err" id="merr"></p><button class="btn gold" id="msend">Send invite</button></div>`;
   document.body.appendChild(d); const close=()=>d.remove(); d.querySelector('[data-x]').onclick=close; d.onclick=e=>{ if(e.target===d) close(); };
   d.querySelectorAll('#mk button').forEach(b=>b.onclick=()=>{ mode=b.dataset.k; d.querySelectorAll('#mk button').forEach(x=>x.setAttribute('aria-pressed',x===b)); d.querySelector('#mplan').hidden=mode!=='plan'; d.querySelector('#mnew').hidden=mode!=='new'; });
@@ -1254,39 +1286,61 @@ async function meetSheet(o){ if(!o) return;
 }
 
 // ---------- chats ----------
+// Chats: three tabs (Chats · Groups · Friends) and one + button, instead of four stacked sections
 async function renderChats(){
-  const { data:cons } = await SB.rpc('my_chats');
-  $app.innerHTML = `<div class="screen"><div class="row between"><h1>Chats</h1><button class="btn sm" id="frl" style="width:auto">👫 Friends</button></div>
-    <div class="card"><p style="font-weight:600">Add a friend by handle</p>
-      <div class="row" style="gap:8px;margin-top:8px"><input type="text" id="fh" placeholder="@handle" maxlength="21" autocapitalize="none" autocomplete="off" style="flex:1"><button class="btn sm gold" id="fsend" style="width:auto">Send</button></div>
-      <p class="small muted" id="fmsg" style="margin-top:6px">Ask them for their exact handle. You're friends once they accept. Yours is <b style="color:var(--ink)">@${esc(S.profile.handle||'')}</b>.</p></div>
-    <div id="freqs"></div>
-    <div class="row between" style="margin-top:4px"><h2 style="margin:0">Groups</h2><button class="btn sm violet" id="ng" style="width:auto">+ New group</button></div>
-    <div class="list" id="glist"><p class="small muted">Loading…</p></div>
-    <h2>Chats</h2>
-    <div class="list" id="clist">${(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
-      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span><span data-vb="c:${c.id}"></span></p>
-      <p class="small" style="color:${kept?'var(--green)':'var(--gold)'}">${kept?'Friends · chat stays':mineKept?'You added them · waiting on them':'Disappears in '+hrs+'h if quiet · Add friend to keep it'}</p>${(c.shared_desires||[]).length?`<p class="small" style="color:var(--violet)">You're both into: ${c.shared_desires.map(esc).join(', ')}</p>`:''}</div></button>`}).join('') : '<p class="muted">When you and someone both say hi, a chat opens here. It stays open as long as you keep talking, and disappears after 14 quiet hours unless you both tap Add friend.</p>'}</div></div>`;
-  document.querySelectorAll('#clist .item').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
-  document.getElementById('ng').onclick=newGroup; document.getElementById('frl').onclick=renderFriends;
-  SB.rpc('my_groups').then(({data})=>{ const gl=document.getElementById('glist'); if(!gl) return; const gs=data||[];
-    gl.innerHTML=gs.length?gs.map(g=>`<button class="item" data-g="${g.id}"><div class="avatar" style="width:48px;height:48px;background:${g.is_plan?'var(--gold)':'var(--violet)'};font-size:22px">${g.is_plan?'📅':'👥'}</div><div style="flex:1;min-width:0"><p style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</p><p class="small muted">${g.is_plan?'Plan chat · ':''}${g.members} ${g.members===1?'person':'people'}</p></div>${g.unread?`<span class="ubdg">${g.unread}</span>`:''}</button>`).join('')
-      :'<p class="small muted">Start a group with friends. Everyone going to a plan also gets a plan chat here.</p>';
-    gl.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGroup(b.dataset.g)); });
-  const send=async()=>{ const h=document.getElementById('fh').value.trim().replace(/^@/,'').toLowerCase(); const m=document.getElementById('fmsg');
+  const tab=S.ctab||'chats';
+  $app.innerHTML=`<div class="screen">
+    <div class="row between"><h1>Chats</h1><button class="btn sm gold" id="cplus" style="width:44px;padding:0;font-size:24px" aria-label="Add a friend or start a group">+</button></div>
+    <div class="seg" id="ctabs">${[['chats','Chats'],['groups','Groups'],['friends','Friends']].map(([k,l])=>`<button data-k="${k}" aria-pressed="${k===tab}">${l}<span class="tdot" data-dot="${k}" hidden></span></button>`).join('')}</div>
+    <div id="cbody" class="list"><p class="small muted">Loading…</p></div></div>`;
+  document.querySelectorAll('#ctabs button').forEach(b=>b.onclick=()=>{ S.ctab=b.dataset.k; renderChats(); });
+  document.getElementById('cplus').onclick=()=>{ const sh=sheet(`<h2 style="margin:0">Add</h2>
+      <button class="item" id="pa1"><span class="navic">👋</span><div><p style="font-weight:600">Add a friend by handle</p><p class="small muted">Yours is @${esc(S.profile.handle||'')}</p></div></button>
+      <button class="item" id="pa2"><span class="navic">👥</span><div><p style="font-weight:600">Start a group</p><p class="small muted">With friends</p></div></button>`);
+    sh.el.querySelector('#pa1').onclick=()=>{ sh.close(); addFriendSheet(); }; sh.el.querySelector('#pa2').onclick=()=>{ sh.close(); newGroup(); }; };
+  const box=document.getElementById('cbody');
+  // unread / request dots on the tabs
+  Promise.all([SB.rpc('unread_by_chat'), SB.rpc('my_groups'), SB.rpc('my_friend_requests')]).then(([u,g,r])=>{
+    const dot=(k,on)=>{ const d=document.querySelector(`[data-dot="${k}"]`); if(d) d.hidden=!on; };
+    dot('chats',(u.data||[]).some(x=>x.n)); dot('groups',(g.data||[]).some(x=>x.unread)); dot('friends',(r.data||[]).length>0); });
+  if(tab==='groups'){
+    const { data } = await SB.rpc('my_groups'); if(!document.body.contains(box)) return; const gs=data||[];
+    box.innerHTML=gs.length?gs.map(g=>`<button class="item" data-g="${g.id}"><div class="avatar" style="width:48px;height:48px;background:${g.is_plan?'var(--gold)':'var(--violet)'};font-size:22px">${g.is_plan?'📅':'👥'}</div><div style="flex:1;min-width:0"><p style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</p><p class="small muted">${g.is_plan?'Plan chat · ':''}${g.members} ${g.members===1?'person':'people'}</p></div>${g.unread?`<span class="ubdg">${g.unread}</span>`:''}</button>`).join('')
+      :`<p class="muted">No groups yet. Tap <b style="color:var(--ink)">+</b> to start one. Plans you join get a group chat here too.</p>`;
+    box.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>openGroup(b.dataset.g)); return;
+  }
+  if(tab==='friends'){
+    const [{ data:reqs }, { data:fr }] = await Promise.all([SB.rpc('my_friend_requests'), SB.rpc('my_friends')]); if(!document.body.contains(box)) return;
+    box.innerHTML=((reqs||[]).length?`<h2>Requests</h2>${reqs.map(r=>`<div class="item" style="cursor:default">${av(r.avatar_icon,r.avatar_color,null,'u:'+r.from_id)}<div style="flex:1"><p style="font-weight:600">@${esc(r.handle)}<span data-vb="u:${r.from_id}"></span></p><p class="small muted">wants to be friends</p></div>
+      <button class="btn sm gold" data-acc="${r.from_id}" style="width:auto">Accept</button><button class="back" data-dec="${r.from_id}" aria-label="Decline" style="padding:0 6px">✕</button></div>`).join('')}<h2>Friends</h2>`:'')
+      + ((fr||[]).length?fr.map(f=>`<button class="item" data-f="${f.id}">${av(f.avatar_icon,f.avatar_color,null,'u:'+f.id)}<div style="flex:1"><p style="font-weight:600">@${esc(f.handle)}<span data-vb="u:${f.id}"></span></p><p class="small muted">${esc(f.first_name||'')}</p></div><span class="muted">›</span></button>`).join('')
+      :`<p class="muted">No friends yet. Tap <b style="color:var(--ink)">+</b> to add someone by handle.</p>`);
+    box.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFriend(b.dataset.f, renderChats));
+    box.querySelectorAll('[data-acc],[data-dec]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.acc; const { data:cid, error } = await SB.rpc('answer_friend_request',{ sender:b.dataset.acc||b.dataset.dec, ok });
+      if(error) return toast(error.message); refreshBadges(); if(ok&&cid){ toast("You're friends now"); openChat(cid); } else renderChats(); });
+    return;
+  }
+  const { data:cons } = await SB.rpc('my_chats'); if(!document.body.contains(box)) return;
+  box.innerHTML=(cons||[]).length? cons.map(c=>{ const kept=c.kept_a&&c.kept_b, mineKept = c.i_am_a?c.kept_a:c.kept_b; const hrs=Math.max(0,Math.round((new Date(c.expires_at)-Date.now())/36e5));
+      return `<button class="item" data-id="${c.id}">${av(c.other_icon,c.other_color,null,'c:'+c.id)}<div style="flex:1;min-width:0"><p style="font-weight:600">${esc(c.other_name)} <span class="small muted">@${esc(c.other_handle||'member')}</span><span data-vb="c:${c.id}"></span></p>
+      <p class="small" style="color:${kept?'var(--muted)':'var(--gold)'}">${kept?'Friends':mineKept?'Waiting on them to add you':'⏳ '+hrs+'h left · tap Add friend to keep'}</p></div></button>`}).join('')
+    : `<p class="muted">No chats yet. When you and someone both say hi, a chat opens here.</p>`;
+  box.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openChat(b.dataset.id));
+  SB.rpc('unread_by_chat').then(({data})=>(data||[]).forEach(u=>{ const it=document.querySelector(`#cbody .item[data-id="${u.cid}"]`); if(it&&u.n&&!it.querySelector('.ubdg')) it.insertAdjacentHTML('beforeend',`<span class="ubdg">${u.n}</span>`); }));
+}
+function addFriendSheet(){
+  const sh=sheet(`<h2 style="margin:0">Add a friend</h2>
+    <div class="row" style="gap:8px"><input type="text" id="fh" placeholder="@handle" maxlength="21" autocapitalize="none" autocomplete="off" style="flex:1"><button class="btn sm gold" id="fsend" style="width:auto">Send</button></div>
+    <p class="small muted" id="fmsg">Ask them for their exact handle. Yours is <b style="color:var(--ink)">@${esc(S.profile.handle||'')}</b>.</p>`);
+  const fh=sh.el.querySelector('#fh'), m=sh.el.querySelector('#fmsg'); setTimeout(()=>fh.focus(),50);
+  const send=async()=>{ const h=fh.value.trim().replace(/^@/,'').toLowerCase();
     if(!HANDLE_RE.test(h)) { m.textContent='Handles are 3–20 letters, numbers, _ or .'; m.style.color='var(--gold)'; return; }
     if(h===S.profile.handle){ m.textContent="That's you!"; return; }
     const { data, error } = await SB.rpc('friend_request',{ h }); if(error){ m.textContent=error.message; m.style.color='var(--red)'; return; }
-    document.getElementById('fh').value='';
-    if(data==='friends'){ toast("You're friends now"); renderChats(); return; }
+    fh.value='';
+    if(data==='friends'){ sh.close(); toast("You're friends now"); renderChats(); return; }
     m.style.color='var(--green)'; m.textContent=`Sent. If @${h} is on MIRL, they'll see your request.`; };
-  document.getElementById('fsend').onclick=send; document.getElementById('fh').onkeydown=e=>{ if(e.key==='Enter') send(); };
-  SB.rpc('unread_by_chat').then(({data})=>(data||[]).forEach(u=>{ const it=document.querySelector(`.list .item[data-id="${u.cid}"]`); if(it&&u.n&&!it.querySelector('.ubdg')) it.insertAdjacentHTML('beforeend',`<span class="ubdg">${u.n}</span>`); }));
-  const { data:reqs } = await SB.rpc('my_friend_requests'); const fr=document.getElementById('freqs'); if(!fr) return;
-  fr.innerHTML=(reqs||[]).length?`<h2>Friend requests</h2><div class="list">${reqs.map(r=>`<div class="item" style="cursor:default">${av(r.avatar_icon,r.avatar_color,null,'u:'+r.from_id)}<div style="flex:1"><p style="font-weight:600">@${esc(r.handle)}<span data-vb="u:${r.from_id}"></span></p><p class="small muted">wants to be friends</p></div>
-    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><button class="btn sm gold" data-acc="${r.from_id}" style="width:auto">Accept</button><button class="back small" data-dec="${r.from_id}" style="font-size:12px">Decline</button></div></div>`).join('')}</div>`:'';
-  fr.querySelectorAll('[data-acc],[data-dec]').forEach(b=>b.onclick=async()=>{ const ok=!!b.dataset.acc; const { data:cid, error } = await SB.rpc('answer_friend_request',{ sender:b.dataset.acc||b.dataset.dec, ok });
-    if(error) return toast(error.message); if(ok&&cid){ toast("You're friends now"); openChat(cid); } else renderChats(); });
+  sh.el.querySelector('#fsend').onclick=send; fh.onkeydown=e=>{ if(e.key==='Enter') send(); };
 }
 const REACTS=['👍','👎','❤️','😂','‼️'];
 async function openChat(cid){
@@ -1362,8 +1416,8 @@ async function openChat(cid){
 // ---------- groups: friend groups + plan chats ----------
 function friendPicker(title, skip, okText, extra){ return new Promise(async res=>{
   const { data } = await SB.rpc('my_friends'); const fr=(data||[]).filter(f=>!(skip||[]).includes(f.id)); const sel=new Set();
-  const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;z-index:2500;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
-  d.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:85vh;overflow:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px">
+  const d=document.createElement('div'); d.className='sheetbg';
+  d.innerHTML=`<div class="sheet"><div class="grab"></div>
     <div class="row between"><h2 style="margin:0">${esc(title)}</h2><button class="back" data-x aria-label="Close">✕</button></div>${extra||''}
     ${fr.length?`<div class="list">${fr.map(f=>`<button class="item" data-f="${f.id}">${av(f.avatar_icon,f.avatar_color,40)}<p style="flex:1;font-weight:600">@${esc(f.handle)}</p><span class="ck" style="width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:700"></span></button>`).join('')}</div>`
       :'<p class="muted">No friends to add yet. Add friends by handle in Chats, or tap Add friend in a chat.</p>'}
@@ -1438,100 +1492,132 @@ async function openGroup(gid){
 async function openPlanChat(pid){ const { data } = await SB.rpc('my_groups'); const g=(data||[]).find(x=>x.plan_id===pid); if(!g) return toast('RSVP to join the plan chat'); openGroup(g.id); }
 
 // ---------- me / living room ----------
+// Living Room = a short menu; each area opens its own page (less to take in at once)
+const navRow=(id,ic,title,sub,extra)=>`<button class="item navrow" id="${id}"><span class="navic">${ic}</span><div style="flex:1;min-width:0"><p style="font-weight:600">${title}</p>${sub?`<p class="small muted">${sub}</p>`:''}</div>${extra||''}<span class="muted" style="font-size:22px;line-height:1">›</span></button>`;
+function subPage(title, body){ if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
+  $app.innerHTML=`<div class="screen"><button class="back" id="bk">‹ Living Room</button><h1>${title}</h1>${body}</div>`; document.getElementById('bk').onclick=()=>renderMe(); window.scrollTo(0,0); }
 function renderMe(needHandle){
-  const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
-  const ist={ icon:p.avatar_icon||'✨', color:p.avatar_color||COLORS[0] };
-  let mode=p.mode, ghost=p.ghost_mode, casual=p.open_to_casual, act=p.share_activity!==false; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
-  $app.innerHTML = `<div class="screen">
-    <div class="row between"><h1>My Living Room</h1><span class="small muted" id="cnt">${p.interests.length} interests</span></div>
-    ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">New: pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
-    ${idBlock(p.handle||'',ist.icon,ist.color)}
-    <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b>${p.founding_member?' · <b style="color:var(--violet)">★ Founding Member</b>':''}</p>
-    <button class="btn" id="myfr">👫 My friends</button><p class="small muted" id="refc" style="margin-top:-8px"></p>
-    <h2>About me</h2>
-    <label class="f">Bio <span class="small muted">· people you chat with see this</span><textarea id="bio" maxlength="300" rows="3" placeholder="Delray local, always up for live music and tacos.">${esc(p.bio||'')}</textarea></label>
-    <p style="font-weight:600;margin:6px 0">My links <span class="small muted" style="font-weight:400">· Facebook, LinkedIn, your business, anything</span></p>
-    <div id="lnk" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button class="back small" id="lnkadd" style="align-self:flex-start">+ Add a link</button>
-    <h2>My photos</h2>
-    <p class="small muted" style="margin-bottom:10px">Optional, up to 4. MIRL checks every photo before anyone sees it. Approved photos show only inside a chat, after you both said hi, unless you pick one as your avatar. Must be you. No nudity.</p>
-    <div id="ph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
-    <input type="file" id="phf" accept="image/*" hidden>
-    <h2>🔒 Private folder</h2>
-    ${p.verified?'':'<div class="card row between" style="border-color:var(--gold);gap:10px"><p class="small"><b>Step 1:</b> get your ✓ to unlock your private folder.</p><button class="btn sm gold" id="pvgo" style="width:auto;flex-shrink:0">Verify</button></div>'}
-    <p class="small muted" style="margin-bottom:10px">Up to 12 photos plus a hidden bio. Spicy is OK. MIRL only checks it's legal: it's you (or you have their OK), everyone's an adult. Only the friends you pick below can see it, and you can take it back any time. Needs a verified selfie.</p>
-    <label class="f">Hidden bio <span class="small muted">· only for friends you share with</span><textarea id="pbio" maxlength="500" rows="3" placeholder="The stuff you only tell people you trust.">${esc(p.private_bio||'')}</textarea></label>
-    <div id="pph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div>
-    <input type="file" id="pphf" accept="image/*" hidden>
-    <p style="font-weight:600;margin:12px 0 6px">Who can see it</p>
-    <div id="pshare" class="list"></div>
-    <h2>Get verified</h2>
-    <div class="card" id="vfy"></div>
-    <input type="file" id="vff" accept="image/*" capture="user" hidden>
-    ${S.user.id===ADMIN_ID?'<button class="btn violet" id="admbtn" style="margin-top:16px">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>':''}
-    <h2>I'm looking for</h2>
-    <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Open to both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
-    <h2>Tap what you're into</h2>
-    <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="${!!picked[i]}">${esc(i)}</button>`).join('')}</div>
-    <h2>Who I am & what I'm open to</h2>
-    ${pickField('or','Orientation (optional)',ORIENTS,p.orientation)}
-    ${pickField('rs','Relationship style (optional)',RSTYLES,p.relationship_style)}
-    <div class="row" style="gap:8px"><label class="f" style="flex:1">Ages from<input type="number" id="amin" min="18" max="99" value="${p.show_age_min}"></label><label class="f" style="flex:1">to<input type="number" id="amax" min="18" max="99" value="${p.show_age_max}"></label></div>
-    <div class="card row between"><div><p style="font-weight:600">Open to something casual</p><p class="small muted">Only members who also turned this on will see it</p></div><button class="switch" id="cs" role="switch" aria-checked="${casual}" aria-label="Open to something casual"></button></div>
-    <div id="dz" ${casual?'':'hidden'}>
-      <h2>My private side</h2>
-      <p class="small muted" style="margin-bottom:10px">Never shown in the room or on the map. Only when you both say hi and you're both open to casual, your chat shows what you have in common. Nothing else.</p>
-      <div class="chips" id="dchips">${DESIRES.map(i=>`<button class="chip" aria-pressed="${!!dpick[i]}">${esc(i)}</button>`).join('')}</div>
-    </div>
-    <h2>Notifications</h2>
-    <div class="card" id="ntf"></div>
-    <h2>Discreet Mode</h2>
-    <div class="card" id="dsc"></div>
-    <h2>Privacy</h2>
-    <div class="card row between"><div><p style="font-weight:600" id="gt">Ghost Mode ${ghost?'on':'off'}</p><p class="small muted">On: your friends can't see where you are. Off: your spot counts toward "friends here" on their map. A small number can still hint it's you, so leave it on if you'd rather not be found. Strangers never see you unless they're inside the same spot, either way.</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
-    <div class="card row between"><div><p style="font-weight:600">Count me in area activity</p><p class="small muted">While MIRL is open, you add to the purple glow on the map. It only uses a rough area about 3 blocks wide, never your name, disappears after an hour, and only shows when 3 or more people are around.</p></div><button class="switch" id="as" role="switch" aria-checked="${act}" aria-label="Count me in area activity"></button></div>
-    <div class="card"><p style="font-weight:600">Blocked people</p><p class="small muted" style="margin-bottom:8px">They can't see you or message you. Unblock to undo it. Your friendship comes back if you were friends.</p><div id="blk" class="list"></div></div>
-    <button class="btn gold" id="sv">Save</button>
-    <button class="btn" id="so">Sign out</button>
-    ${window.matchMedia('(display-mode: standalone)').matches||navigator.standalone?'':'<div class="card"><p style="font-weight:600">Put MIRL on your home screen</p><p class="small muted">iPhone: tap Share, then Add to Home Screen. Android: tap the ⋮ menu, then Add to Home screen.</p></div>'}
-    <p class="small muted" style="text-align:center">MIRL test version · <a href="/privacy/">Privacy</a> · hello@gomirl.com</p>
-    <button class="btn" id="del" style="color:var(--red);border-color:transparent;min-height:40px">Delete my account</button>
-  </div>`;
-  document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
-  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent=Object.values(picked).filter(Boolean).length+' interests'; });
-  wireId(ist);
+  if(needHandle) return renderProfile(true);
+  const p=S.profile, admin=S.user.id===ADMIN_ID;
+  $app.innerHTML=`<div class="screen">
+    <div class="row" style="gap:14px"><div id="avp">${S.myAvatarUrl?photoAv(S.myAvatarUrl,64):av(p.avatar_icon,p.avatar_color,64)}</div>
+      <div style="min-width:0"><h1 style="margin:0;overflow:hidden;text-overflow:ellipsis">@${esc(p.handle||'')}${p.verified?' <span style="color:var(--green);font-size:20px">✓</span>':''}</h1>
+      <p class="small muted">${esc(p.first_name||'')}${p.founding_member?' · <span style="color:var(--violet)">★ Founding Member</span>':''}</p></div></div>
+    <p class="small" id="refc" style="color:var(--violet)" hidden></p>
+    <div class="list">
+      ${navRow('m_prof','👤','Profile','Avatar, bio, interests')}
+      ${navRow('m_ph','📸','Photos','Photos, private folder, get your ✓', p.verified?'':'<span class="ubdg" style="background:var(--gold);color:var(--bg)">✓?</span>')}
+      ${navRow('m_fr','👫','Friends','')}
+      ${navRow('m_nt','🔔','Notifications','')}
+      ${navRow('m_pv','🛡️','Privacy & Discreet','Ghost Mode, app lock, blocked')}
+      ${navRow('m_ac','⚙️','Account','Sign out, home screen, delete')}
+      ${admin?navRow('m_ad','👑','Admin','Members, photo + selfie checks','<span class="ubdg" id="adn" hidden></span>'):''}
+    </div></div>`;
+  document.getElementById('m_prof').onclick=()=>renderProfile();
+  document.getElementById('m_ph').onclick=renderPhotos;
+  document.getElementById('m_fr').onclick=renderFriends;
+  document.getElementById('m_nt').onclick=()=>{ subPage('Notifications','<div class="card" id="ntf"></div>'); drawNotify(); };
+  document.getElementById('m_pv').onclick=renderPrivacy;
+  document.getElementById('m_ac').onclick=renderAccount;
+  if(admin){ document.getElementById('m_ad').onclick=renderAdminHub;
+    Promise.all([SB.rpc('pending_photos'), SB.rpc('pending_verifications')]).then(([a,b])=>{ const n=(a.data||[]).length+(b.data||[]).length, e=document.getElementById('adn'); if(e&&n){ e.textContent=n; e.hidden=false; } }); }
+  SB.rpc('my_referrals').then(({data})=>{ const r=document.getElementById('refc'); if(r&&data){ r.textContent=`🎟️ You've brought ${data} ${data===1?'person':'people'} to MIRL`; r.hidden=false; } });
+}
+function renderAdminHub(){ subPage('Admin',`<button class="btn violet" id="admbtn">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>`);
+  document.getElementById('admbtn').onclick=renderAdmin; drawReview(); }
+function renderPhotos(){ const p=S.profile;
+  subPage('Photos',`
+    <div class="row between"><h2 style="margin:0">My photos ${tip('Up to 4. MIRL checks each one first. They show only inside a chat after you both say hi, unless you use one as your avatar. Must be you. No nudity.')}</h2></div>
+    <div id="ph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div><input type="file" id="phf" accept="image/*" hidden>
+    <h2>Get your ✓ ${tip('A quick selfie doing a pose proves it\'s really you. You need it for the private folder and Meet invites.')}</h2>
+    <div class="card" id="vfy"></div><input type="file" id="vff" accept="image/*" capture="user" hidden>
+    <h2>🔒 Private folder ${tip('Up to 12 photos plus a hidden bio. Spicy is OK. MIRL only checks it\'s legal: it\'s you (or you have their OK) and everyone is an adult. Only friends you pick can see it, and you can take it back any time.')}</h2>
+    ${p.verified?'':'<div class="card row between" style="border-color:var(--gold);gap:10px"><p class="small">Get your ✓ first to unlock it.</p><button class="btn sm gold" id="pvgo" style="width:auto;flex-shrink:0">Verify</button></div>'}
+    <div id="pph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div><input type="file" id="pphf" accept="image/*" hidden>
+    <label class="f">Hidden bio<textarea id="pbio" maxlength="500" rows="3" placeholder="Only friends you share with see this.">${esc(p.private_bio||'')}</textarea></label>
+    <button class="btn sm" id="pbsv" style="align-self:flex-start">Save hidden bio</button>
+    <p style="font-weight:600;margin-top:4px">Who can see it</p><div id="pshare" class="list"></div>`);
   document.getElementById('pvgo')?.addEventListener('click',()=>needVerify('use a private folder'));
-  drawMyPhotos(); drawMyAlbum(); drawBlocks(); drawReview(); drawNotify(); drawVerify(); drawDiscreet();
-  document.getElementById('myfr').onclick=renderFriends;
-  SB.rpc('my_referrals').then(({data})=>{ const r=document.getElementById('refc'); if(r&&data) r.textContent=`🎟️ You've brought ${data} ${data===1?'person':'people'} to MIRL with your invites.`; });
-  const links=(Array.isArray(p.links)?p.links:[]).map(l=>({...l}));
-  const drawLinks=()=>{ const b=document.getElementById('lnk'); b.innerHTML=links.map((l,i)=>`<div class="row" style="gap:6px"><input type="text" data-l="${i}" maxlength="30" placeholder="Label" value="${esc(l.label||'')}" style="width:34%"><input type="text" data-u="${i}" maxlength="300" placeholder="https://…" autocapitalize="none" value="${esc(l.url||'')}" style="flex:1"><button class="back small" data-rm="${i}" aria-label="Remove link">✕</button></div>`).join('');
-    b.querySelectorAll('[data-l]').forEach(x=>x.oninput=()=>links[+x.dataset.l].label=x.value); b.querySelectorAll('[data-u]').forEach(x=>x.oninput=()=>links[+x.dataset.u].url=x.value);
-    b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{ links.splice(+x.dataset.rm,1); drawLinks(); });
-    document.getElementById('lnkadd').hidden=links.length>=6; };
-  drawLinks(); document.getElementById('lnkadd').onclick=()=>{ links.push({label:'',url:''}); drawLinks(); };
-  document.getElementById('pphf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f,true); };
-  document.getElementById('admbtn')?.addEventListener('click', renderAdmin);
   document.getElementById('phf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f); };
-  document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
-  document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
-  document.getElementById('as').onclick=e=>{ act=!act; e.currentTarget.setAttribute('aria-checked',act); };
-  document.getElementById('gs').onclick=e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); document.getElementById('gt').textContent='Ghost Mode '+(ghost?'on':'off'); };
-  document.getElementById('sv').onclick=async()=>{
-    const hc=await checkHandle(); if(hc.err){ const hm=document.getElementById('hdmsg'); hm.textContent=hc.err; hm.style.color='var(--red)'; document.getElementById('hd').scrollIntoView({block:'center'}); document.getElementById('hd').focus(); return; }
-    const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
-    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, ghost_mode:ghost, share_activity:act, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color,
-      bio:document.getElementById('bio').value.trim()||null, private_bio:document.getElementById('pbio').value.trim()||null,
-      links:links.map(l=>({ label:(l.label||'').trim(), url:(l.url||'').trim() })).filter(l=>l.url).map(l=>({ label:l.label, url:/^https?:\/\//i.test(l.url)?l.url:'https://'+l.url })) };
-    const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
-    if(error) return toast(error.message); if(!act) SB.rpc('ping_area',{ p_lat:0, p_lng:0 }); toast('Saved'); loadProfile();
-  };
+  document.getElementById('pphf').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) uploadPhoto(f,true); };
+  document.getElementById('pbsv').onclick=async()=>{ const v=document.getElementById('pbio').value.trim()||null; const { error } = await SB.from('profiles').update({ private_bio:v }).eq('id',S.user.id); if(error) return toast(error.message); S.profile.private_bio=v; toast('Saved'); };
+  drawMyPhotos(); drawVerify(); drawMyAlbum();
+}
+function renderPrivacy(){ const p=S.profile; let ghost=p.ghost_mode, act=p.share_activity!==false;
+  subPage('Privacy & Discreet',`
+    <div class="card row between"><div><p style="font-weight:600">Ghost Mode ${tip('On: friends can\'t see which spot you\'re at. Strangers never see you unless they\'re inside the same spot, either way.')}</p><p class="small muted">Hide where you are from friends</p></div><button class="switch" id="gs" role="switch" aria-checked="${ghost}" aria-label="Ghost Mode"></button></div>
+    <div class="card row between"><div><p style="font-weight:600">Area activity ${tip('Adds you to the purple glow on the map. Rough area only (about 3 blocks), never your name, gone after an hour, and only shown when 3+ people are around.')}</p><p class="small muted">Count me in the map glow</p></div><button class="switch" id="as" role="switch" aria-checked="${act}" aria-label="Count me in area activity"></button></div>
+    <h2>Discreet Mode</h2><div class="card" id="dsc"></div>
+    <h2>Blocked people</h2><div class="card"><div id="blk" class="list"></div></div>`);
+  document.getElementById('gs').onclick=async e=>{ ghost=!ghost; e.currentTarget.setAttribute('aria-checked',ghost); await SB.from('profiles').update({ ghost_mode:ghost }).eq('id',S.user.id); S.profile.ghost_mode=ghost; toast('Ghost Mode '+(ghost?'on':'off')); };
+  document.getElementById('as').onclick=async e=>{ act=!act; e.currentTarget.setAttribute('aria-checked',act); await SB.from('profiles').update({ share_activity:act }).eq('id',S.user.id); S.profile.share_activity=act; if(!act) SB.rpc('ping_area',{ p_lat:0, p_lng:0 }); toast(act?'You count in the glow':'You\'re out of the glow'); };
+  drawDiscreet(); drawBlocks();
+}
+function renderAccount(){
+  subPage('Account',`
+    ${window.matchMedia('(display-mode: standalone)').matches||navigator.standalone?'':'<div class="card"><p style="font-weight:600">📲 Put MIRL on your home screen</p><p class="small muted">iPhone: Share → Add to Home Screen. Android: ⋮ → Add to Home screen.</p></div>'}
+    <button class="btn" id="so">Sign out</button>
+    <p class="small muted" style="text-align:center">MIRL test version · <a href="/privacy/">Privacy</a> · hello@gomirl.com</p>
+    <button class="btn" id="del" style="color:var(--red);border-color:transparent;min-height:40px">Delete my account</button>`);
   document.getElementById('so').onclick=async()=>{ await SB.auth.signOut(); S.user=null; S.profile=null; render(); };
   document.getElementById('del').onclick=async()=>{
     if(!confirm('Delete your MIRL account? Your profile, plans, chats and everything else will be permanently deleted. This cannot be undone.')) return;
     try{ const { data:files } = await SB.storage.from('photos').list(S.user.id,{ limit:100 }); if((files||[]).length) await SB.storage.from('photos').remove(files.map(f=>S.user.id+'/'+f.name)); }catch{}
     const { error } = await SB.rpc('delete_my_account'); if(error) return toast('Could not delete: '+error.message);
     await SB.auth.signOut(); S.user=null; S.profile=null; toast('Your account was deleted'); render(); };
+}
+function renderProfile(needHandle){
+  const p=S.profile; const picked={}; p.interests.forEach(i=>picked[i]=true);
+  const ist={ icon:p.avatar_icon||'✨', color:p.avatar_color||COLORS[0] };
+  let mode=p.mode, casual=p.open_to_casual; const dpick={}; (p.desires||[]).forEach(i=>dpick[i]=true);
+  $app.innerHTML = `<div class="screen">
+    ${needHandle?'':'<button class="back" id="bk">‹ Living Room</button>'}
+    <h1>Profile</h1>
+    ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">Pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
+    ${idBlock(p.handle||'',ist.icon,ist.color)}
+    <p class="small muted">First name: <b style="color:var(--ink)">${esc(p.first_name)}</b> ${tip('Your first name only shows after you and someone both say hi.')}</p>
+    <h2>About me</h2>
+    <label class="f">Bio<textarea id="bio" maxlength="300" rows="3" placeholder="Delray local, always up for live music and tacos.">${esc(p.bio||'')}</textarea></label>
+    <p style="font-weight:600">Links ${tip('Facebook, LinkedIn, your business, anything. People you chat with see these.')}</p>
+    <div id="lnk" style="display:flex;flex-direction:column;gap:8px"></div>
+    <button class="back" id="lnkadd" style="align-self:flex-start">+ Add a link</button>
+    <h2>I'm looking for</h2>
+    <div class="seg" id="mode">${['dating','both','friends'].map(v=>`<button data-v="${v}" aria-pressed="${v===mode}">${v==='both'?'Both':v[0].toUpperCase()+v.slice(1)}</button>`).join('')}</div>
+    <h2>I'm into <span id="cnt" style="text-transform:none;letter-spacing:0">· ${p.interests.length}</span></h2>
+    <div class="chips" id="chips">${INTERESTS.map(i=>`<button class="chip" aria-pressed="${!!picked[i]}">${esc(i)}</button>`).join('')}</div>
+    <details class="more"><summary>More about me <span class="small muted">(optional)</span></summary>
+      ${pickField('or','Orientation',ORIENTS,p.orientation)}
+      ${pickField('rs','Relationship style',RSTYLES,p.relationship_style)}
+      <div class="row" style="gap:8px"><label class="f" style="flex:1">Show ages from<input type="number" id="amin" min="18" max="99" value="${p.show_age_min}"></label><label class="f" style="flex:1">to<input type="number" id="amax" min="18" max="99" value="${p.show_age_max}"></label></div>
+      <div class="card row between"><div><p style="font-weight:600">Open to something casual ${tip('Only members who also turned this on will see it.')}</p></div><button class="switch" id="cs" role="switch" aria-checked="${casual}" aria-label="Open to something casual"></button></div>
+      <div id="dz" ${casual?'':'hidden'}>
+        <p style="font-weight:600;margin:6px 0">My private side ${tip('Never shown in a spot or on the map. Only when you both say hi and are both open to casual, your chat shows what you have in common.')}</p>
+        <div class="chips" id="dchips">${DESIRES.map(i=>`<button class="chip" aria-pressed="${!!dpick[i]}">${esc(i)}</button>`).join('')}</div>
+      </div>
+    </details>
+    <div class="savebar"><button class="btn gold" id="sv">Save</button></div>
+  </div>`;
+  document.getElementById('bk')?.addEventListener('click',()=>renderMe());
+  document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent='· '+Object.values(picked).filter(Boolean).length; });
+  wireId(ist);
+  const links=(Array.isArray(p.links)?p.links:[]).map(l=>({...l}));
+  const drawLinks=()=>{ const b=document.getElementById('lnk'); b.innerHTML=links.map((l,i)=>`<div class="row" style="gap:6px"><input type="text" data-l="${i}" maxlength="30" placeholder="Label" value="${esc(l.label||'')}" style="width:34%"><input type="text" data-u="${i}" maxlength="300" placeholder="https://…" autocapitalize="none" value="${esc(l.url||'')}" style="flex:1"><button class="back" data-rm="${i}" aria-label="Remove link" style="min-width:32px">✕</button></div>`).join('');
+    b.querySelectorAll('[data-l]').forEach(x=>x.oninput=()=>links[+x.dataset.l].label=x.value); b.querySelectorAll('[data-u]').forEach(x=>x.oninput=()=>links[+x.dataset.u].url=x.value);
+    b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{ links.splice(+x.dataset.rm,1); drawLinks(); });
+    document.getElementById('lnkadd').hidden=links.length>=6; };
+  drawLinks(); document.getElementById('lnkadd').onclick=()=>{ links.push({label:'',url:''}); drawLinks(); };
+  document.getElementById('cs').onclick=e=>{ casual=!casual; e.currentTarget.setAttribute('aria-checked',casual); document.getElementById('dz').hidden=!casual; };
+  document.querySelectorAll('#dchips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); dpick[b.textContent]=on; });
+  document.getElementById('sv').onclick=async()=>{
+    const hc=await checkHandle(); if(hc.err){ const hm=document.getElementById('hdmsg'); hm.textContent=hc.err; hm.style.color='var(--red)'; document.getElementById('hd').scrollIntoView({block:'center'}); document.getElementById('hd').focus(); return; }
+    const amin=Math.max(18,+document.getElementById('amin').value||18), amax=Math.max(amin,+document.getElementById('amax').value||99);
+    const upd={ mode, interests:Object.keys(picked).filter(k=>picked[k]), orientation:pickVal('or'), relationship_style:pickVal('rs'), show_age_min:amin, show_age_max:Math.min(99,amax), open_to_casual:casual, desires:Object.keys(dpick).filter(k=>dpick[k]), handle:hc.h, avatar_icon:ist.icon, avatar_color:ist.color,
+      bio:document.getElementById('bio').value.trim()||null,
+      links:links.map(l=>({ label:(l.label||'').trim(), url:(l.url||'').trim() })).filter(l=>l.url).map(l=>({ label:l.label, url:/^https?:\/\//i.test(l.url)?l.url:'https://'+l.url })) };
+    const { error } = await SB.from('profiles').update(upd).eq('id',S.user.id);
+    if(error) return toast(error.message); toast('Saved'); const { data } = await SB.from('profiles').select('*').eq('id',S.user.id).maybeSingle(); S.profile=data; if(needHandle) render(); else renderMe();
+  };
 }
 
 // ---------- invite links ----------
