@@ -121,6 +121,9 @@ details.more summary::after{content:" ▾";color:var(--muted)}
 .iconrow button span{font-size:22px}
 .back{min-height:40px}
 .seg button{position:relative}
+.pin .pplan{display:block;font-weight:500;font-size:11px;opacity:.95;margin-top:2px}
+.pin.hasplan{border:1.5px solid var(--gold)}
+.ptag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--surface2);margin-left:4px;white-space:nowrap}
 .tdot{position:absolute;top:6px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--red)}
 .brandlogo{display:block;height:auto;pointer-events:none}
 html.plain .brandlogo{display:none!important}
@@ -792,7 +795,7 @@ function renderWelcome(){
   document.getElementById('g').onclick = ()=>go('google');
   const j=pendingJoin(); if(j) SB.rpc('plan_preview',{ code:j.code }).then(({data})=>{ const pl=(data||[])[0]; if(!pl||!document.getElementById('g')) return;
     const d=new Date(pl.starts_at).toLocaleString('en-US',{ weekday:'long', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
-    document.querySelector('.hero h1').insertAdjacentHTML('beforebegin', `<div class="card" style="border-color:var(--gold)"><p class="small muted">🎟️ You're invited</p><p style="font-weight:700;font-size:20px;margin:4px 0">@${esc(j.by||pl.host)} invited you to ${esc(pl.title)}</p><p class="small">📍 ${esc(pl.venue)} · ${esc(d)} · ${pl.going} going</p></div>`);
+    document.querySelector('.hero h1').insertAdjacentHTML('beforebegin', `<div class="card" style="border-color:var(--gold)"><p class="small muted">🎟️ You're invited</p><p style="font-weight:700;font-size:20px;margin:4px 0">${j.by?'@'+esc(j.by):pl.official?esc(pl.host):'@'+esc(pl.host)} invited you to ${esc(pl.title)}</p><p class="small">📍 ${esc(pl.venue)} · ${esc(d)} · ${pl.going} going</p></div>`);
     const g=document.getElementById('g'); g.textContent="I'm in. Join MIRL to RSVP"; g.insertAdjacentHTML('afterend','<p class="small muted" style="text-align:center;margin-top:-6px">Free. 18+. Your name stays private until you choose to share it.</p>'); }); }
 
 // ---------- onboarding ----------
@@ -861,6 +864,7 @@ async function renderMap(){
     <p class="small muted" id="mapmsg">Numbers = people at a spot. Purple glow = 3+ around. ${tip("You see who's inside a spot once you're there too, and only as avatars and handles.")}</p>
     <div id="addbox"></div>
     <button class="btn" id="addspot">+ Add a missing spot</button>
+    <div id="tonightw" hidden><h2>Tonight's plans</h2><div class="list" id="tlist"></div></div>
     <h2>Spots</h2><div class="list" id="vlist"><p class="small muted">Loading spots…</p></div>
   </div>`;
   const el=document.getElementById('map');
@@ -875,8 +879,15 @@ async function renderMap(){
     const inDelray = Math.abs(c.lat-DELRAY[0])<0.03 && Math.abs(c.lng-DELRAY[1])<0.04;
     document.getElementById('area').textContent = inDelray ? 'Atlantic Ave · Delray Beach · launch zone' : 'Near you';
     const box={ s:b.getSouth(), w:b.getWest(), n:b.getNorth(), e:b.getEast() };
-    const [{ data:dbv }, { data:feat }, { data:fc }, { data:act }] = await Promise.all([SB.rpc('venue_counts_area',box), SB.rpc('featured_plan_area',box), SB.rpc('friend_counts'), SB.rpc('area_activity',box)]);
+    const [{ data:dbv }, { data:feat }, { data:fc }, { data:act }, { data:tp }] = await Promise.all([SB.rpc('venue_counts_area',box), SB.rpc('featured_plan_area',box), SB.rpc('friend_counts'), SB.rpc('area_activity',box), SB.rpc('plans_tonight_area',box)]);
     if(my!==seq) return;
+    // tonight's plans: one per spot on its pin (most going), all of them in a list under the map
+    const TP={}; (tp||[]).forEach(x=>{ if(!TP[x.venue_id]) TP[x.venue_id]=x; });
+    const hm=t=>new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(':00','').replace(' ','').toLowerCase();
+    { const tw=document.getElementById('tonightw'), tl=document.getElementById('tlist');
+      if(tw&&tl){ tw.hidden=!(tp||[]).length;
+        tl.innerHTML=(tp||[]).map((x,i)=>`<button class="item" data-tp="${i}"><div style="flex:1;min-width:0"><p style="font-weight:600">${esc(x.title)}${x.official?'<span class="ptag">📣 Official</span>':''}${x.weekly?'<span class="ptag">🔁 Weekly</span>':''}</p><p class="small muted">${esc(x.venue)} · ${hm(x.starts_at)}</p></div><span class="small" style="color:var(--gold);font-weight:600;white-space:nowrap">${x.im_going?'✓ ':''}${x.going} going</span></button>`).join('');
+        tl.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>openPlan(tp[+b.dataset.tp].plan_id)); } }
     glow.clearLayers();
     (act||[]).forEach(a=>{ const n=a.people, lab=n>=20?'20+':n>=10?'10+':n>=5?'5+':'3+';
       L.circle([a.lat,a.lng],{ radius:190, stroke:false, fillColor:'#7B78FF', fillOpacity:Math.min(.5,.16+n*.02), interactive:true })
@@ -896,8 +907,8 @@ async function renderMap(){
     } else featEl.innerHTML='';
     layer.clearLayers();
     list.forEach((v,i)=>{
-      const n=v.members_here, cls=n>=15?'pin hot':n>=5?'pin warm':'pin';
-      const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}${v.friends_here?' · 👥'+v.friends_here:''}</div>`,iconSize:null});
+      const n=v.members_here, pl=v.venue_id&&TP[v.venue_id], cls=(n>=15?'pin hot':n>=5?'pin warm':'pin')+(pl?' hasplan':'');
+      const icon=L.divIcon({className:'',html:`<div class="${cls}">${n?n+' · ':''}${esc(v.name)}${v.friends_here?' · 👥'+v.friends_here:''}${pl?`<span class="pplan">${pl.official?'📣 ':''}${esc(pl.title.length>26?pl.title.slice(0,25)+'…':pl.title)} · ${hm(pl.starts_at)}</span>`:''}</div>`,iconSize:null});
       L.marker([v.lat,v.lng],{icon}).addTo(layer).on('click',()=>goVenue(v));
     });
     const vl=document.getElementById('vlist');
@@ -1085,6 +1096,7 @@ function newPlan(vid, vname){
     <label class="f">When<input type="datetime-local" id="wh" value="${local}"></label>
     <div class="seg" style="grid-template-columns:1fr 1fr" id="vis"><button aria-pressed="true" data-v="open">Open to members</button><button aria-pressed="false" data-v="invite">Invite-only</button></div>
     <p class="small muted" id="vnote">Shows on the map to members who fit your settings.</p>
+    <div class="card row between"><div><p style="font-weight:600">Repeat every week</p><p class="small muted">For a weekly trivia, karaoke or music night</p></div><button class="switch" id="rw" role="switch" aria-checked="false" aria-label="Repeat every week"></button></div>
     <div id="tagw" hidden><p style="font-weight:600;margin-bottom:6px">Tag friends <span class="small muted" style="font-weight:400">· they get an invite</span></p><div class="chips" id="tagf"></div></div>
     <div class="err" id="err"></div>
     <button class="btn violet" id="go">Post plan</button>
@@ -1117,6 +1129,7 @@ function newPlan(vid, vname){
   SB.rpc('my_friends').then(({data})=>{ const w=document.getElementById('tagw'), c=document.getElementById('tagf'); if(!w||!(data||[]).length) return; w.hidden=false;
     c.innerHTML=data.map(f=>`<button class="chip" aria-pressed="false" data-f="${f.id}">@${esc(f.handle)}</button>`).join('');
     c.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ const on=!tagged.has(b.dataset.f); on?tagged.add(b.dataset.f):tagged.delete(b.dataset.f); b.setAttribute('aria-pressed',on); }); });
+  let rweek=false; document.getElementById('rw').onclick=e=>{ rweek=!rweek; e.currentTarget.setAttribute('aria-checked',rweek); };
   document.querySelectorAll('#vis button').forEach(b=>b.onclick=()=>{ vis=b.dataset.v; document.querySelectorAll('#vis button').forEach(x=>x.setAttribute('aria-pressed',x===b)); document.getElementById('vnote').textContent = vis==='open'?'Shows on the map to members who fit your settings.':'Only people you send the link to can see and join.'; });
   document.getElementById('go').onclick=async()=>{
     const err=document.getElementById('err'); const title=document.getElementById('ti').value.trim();
@@ -1125,7 +1138,7 @@ function newPlan(vid, vname){
     if(!venue_id){ const sel=picked; if(!sel) return err.textContent='Start typing the spot, then tap it in the list.';
       if(!sel.venue_id){ const { data:id, error:e2 } = await SB.rpc('save_osm_venue',{ p_osm:sel.osm_id, p_name:sel.name, p_cat:sel.category||null, p_addr:sel.address||null, p_lat:sel.lat, p_lng:sel.lng }); if(e2) return err.textContent='Could not use that spot.'; sel.venue_id=id; }
       venue_id=sel.venue_id; }
-    const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis }).select('id,invite_code').single();
+    const { data, error } = await SB.from('plans').insert({ venue_id, host_id:S.user.id, title, starts_at:new Date(document.getElementById('wh').value).toISOString(), visibility:vis, repeat_weekly:rweek }).select('id,invite_code').single();
     if(error) return err.textContent='Could not post: '+error.message;
     await SB.from('plan_members').upsert({ plan_id:data.id, user_id:S.user.id, friends:0 });
     if(tagged.size){ const { data:n } = await SB.rpc('invite_friends',{ pid:data.id, uids:[...tagged] }); if(n) toast(`Invited ${n} friend${n>1?'s':''}`); }
@@ -1136,16 +1149,18 @@ function newPlan(vid, vname){
 }
 async function openPlan(pid){
   if(S.chan){ SB.removeChannel(S.chan); S.chan=null; }
-  const { data:p } = await SB.from('plans').select('id,title,starts_at,visibility,host_id,invite_code,venue_id,venues(name)').eq('id',pid).single();
+  const { data:p } = await SB.from('plans').select('id,title,starts_at,visibility,host_id,invite_code,venue_id,repeat_weekly,series_id,venues(name)').eq('id',pid).single();
   if(!p) return toast('Plan not found');
   const { data:mine } = await SB.from('plan_members').select('friends').eq('plan_id',pid).eq('user_id',S.user.id).maybeSingle();
-  const [{ data:cnt }, { data:going }] = await Promise.all([SB.rpc('plan_count',{ pid }), mine ? SB.rpc('plan_going',{ pid }) : Promise.resolve({ data:[] })]);
+  const [{ data:cnt }, { data:going0 }, { data:official }] = await Promise.all([SB.rpc('plan_count',{ pid }), mine ? SB.rpc('plan_going',{ pid }) : Promise.resolve({ data:[] }), SB.rpc('is_official',{ p_venue:p.venue_id, p_host:p.host_id })]);
+  // official venue plans: the bar is the host, the staff member stays private
+  const going=(going0||[]).filter(g=>!(official && g.is_host && g.id!==S.user.id));
   let friends = mine?.friends||0; const w=when(p.starts_at), host=p.host_id===S.user.id;
   const label=()=>friends===0?'Just me':'Me + '+friends+(friends===1?' friend':' friends');
   const dt=new Date(p.starts_at).toLocaleString('en-US',{ weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
   $app.innerHTML = `<div class="screen">
     <div class="row between"><button class="back" id="bk">‹ Back</button>${mine?'<button class="back" id="more" aria-label="More options" style="font-size:22px;padding:0 6px">⋯</button>':''}</div>
-    <div><h1>${esc(p.title)}</h1><p class="muted" style="margin-top:6px">📍 ${esc(p.venues?.name)}<br>🕗 ${esc(dt)}<br>👥 ${cnt||0} going${p.visibility==='open'?'':' · invite-only'}</p></div>
+    <div><h1>${esc(p.title)}</h1><p class="muted" style="margin-top:6px">📍 ${esc(p.venues?.name)}<br>🕗 ${esc(dt)}<br>👥 ${cnt||0} going${p.visibility==='open'?'':' · invite-only'}${p.repeat_weekly||p.series_id?'<br>🔁 Every week':''}${official?`<br>📣 Hosted by ${esc(p.venues?.name)}`:''}</p></div>
     ${mine?`<div class="card row between"><p><b style="color:var(--green)">✓ You're going</b> <span class="muted">· ${label().toLowerCase()}</span></p></div>
       <button class="btn gold" id="psh">📲 Invite anyone</button>
       <div class="iconrow"><button id="pc"><span>💬</span>Plan chat</button><button id="pi"><span>👫</span>Friends</button><button id="pmore"><span>⋯</span>More</button></div>`
@@ -1178,12 +1193,14 @@ async function openPlan(pid){
       <div class="card row between"><b id="sgl">${label()}</b><div class="row"><button class="btn sm" id="smi" aria-label="One fewer friend">−</button><button class="btn sm" id="spl" aria-label="One more friend">+</button></div></div>
       <button class="btn" id="ssv">Update how many I'm bringing</button>
       <button class="btn" id="slv">Not going anymore</button>
+      ${host&&p.repeat_weekly?'<button class="btn" id="srp">Stop repeating every week</button>':''}
       ${host?'<button class="btn" id="scx" style="color:var(--red);border-color:var(--red)">Cancel this plan</button>':''}
       <button class="back" data-close style="align-self:center">Close</button>`);
     const q=x=>sh.el.querySelector(x);
     q('#smi').onclick=()=>{ friends=Math.max(0,friends-1); q('#sgl').textContent=label(); };
     q('#spl').onclick=()=>{ friends=Math.min(4,friends+1); q('#sgl').textContent=label(); };
     q('#ssv').onclick=()=>{ sh.close(); saveGoing(); };
+    const rp=q('#srp'); if(rp) rp.onclick=async()=>{ sh.close(); const { error } = await SB.rpc('stop_repeat',{ pid }); if(error) return toast(error.message); toast('This is the last one. It won\'t repeat.'); openPlan(pid); };
     q('#slv').onclick=async()=>{ sh.close(); await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); refreshBadges(); openPlan(pid); };
     const cx=q('#scx'); if(cx) cx.onclick=async()=>{ if(!confirm('Cancel "'+p.title+'"? Everyone going gets told, and the plan chat closes. This can\'t be undone.')) return;
       sh.close(); const { error } = await SB.rpc('cancel_plan',{ pid }); if(error) return toast(error.message); toast('Plan canceled. Everyone was told.'); refreshBadges(); setTab('plans'); }; };
@@ -1549,8 +1566,25 @@ function renderMe(needHandle){
   if(!p.verified) SB.rpc('my_verification').then(({data})=>{ if(data==='verified'&&!S.profile.verified){ S.profile.verified=true; if(S.tab==='me'&&document.getElementById('m_ph')) renderMe(); } });
   SB.rpc('my_referrals').then(({data})=>{ const r=document.getElementById('refc'); if(r&&data){ r.textContent=`🎟️ You've brought ${data} ${data===1?'person':'people'} to MIRL`; r.hidden=false; } });
 }
-function renderAdminHub(){ subPage('Admin',`<button class="btn violet" id="admbtn">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>`);
-  document.getElementById('admbtn').onclick=renderAdmin; drawReview(); }
+function renderAdminHub(){ subPage('Admin',`<button class="btn violet" id="admbtn">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>
+    <h2>Venue managers ${tip('A manager can post plans for their spot. Their plans show as 📣 Official on the map. Adding one also approves the spot for plans.')}</h2><div class="card" id="vmg" style="display:flex;flex-direction:column;gap:10px"></div>`);
+  document.getElementById('admbtn').onclick=renderAdmin; drawReview(); drawVM(); }
+async function drawVM(){ const box=document.getElementById('vmg'); if(!box) return;
+  const { data } = await SB.rpc('admin_venue_managers'); if(!document.body.contains(box)) return;
+  box.innerHTML=`${(data||[]).length?`<div class="list">${data.map((m,i)=>`<div class="item" style="cursor:default"><div style="flex:1"><p style="font-weight:600">${esc(m.venue)}</p><p class="small muted">@${esc(m.handle||'member')}</p></div><button class="back" data-rm="${i}" aria-label="Remove manager">✕</button></div>`).join('')}</div>`:'<p class="small muted">No venue managers yet.</p>'}
+    <input type="text" id="vmh" placeholder="@handle of the bar manager" autocapitalize="none" autocomplete="off">
+    <input type="text" id="vmq" placeholder="Their spot: start typing…" autocomplete="off"><div class="list" id="vms" style="gap:6px"></div>
+    <button class="btn sm gold" id="vmadd" style="align-self:flex-start">Make manager</button>`;
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{ const m=data[+b.dataset.rm]; if(!confirm('Remove @'+m.handle+' as manager of '+m.venue+'?')) return;
+    const { error } = await SB.rpc('admin_set_venue_manager',{ p_handle:m.handle, p_venue:m.venue_id, on_:false }); if(error) return toast(error.message); drawVM(); });
+  let pick=null, t; const q=box.querySelector('#vmq'), sg=box.querySelector('#vms');
+  q.oninput=()=>{ pick=null; clearTimeout(t); const s=q.value.trim(); if(s.length<2){ sg.innerHTML=''; return; }
+    t=setTimeout(async()=>{ const { data:r } = await SB.rpc('search_venues',{ q:s, p_lat:26.4616, p_lng:-80.0685 });
+      sg.innerHTML=(r||[]).slice(0,6).map((v,i)=>`<button class="item" data-i="${i}" style="padding:8px 12px"><div><p style="font-weight:600">${esc(v.name)}</p><p class="small muted">${esc(v.address||v.category||'')}</p></div></button>`).join('')||'<p class="small muted">No spot found. Add it from the map first.</p>';
+      sg.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ pick=r[+b.dataset.i]; q.value=pick.name; sg.innerHTML=''; }); },300); };
+  box.querySelector('#vmadd').onclick=async()=>{ const h=box.querySelector('#vmh').value.trim(); if(!h) return toast('Add their @handle'); if(!pick) return toast('Pick their spot from the list');
+    const { data:vn, error } = await SB.rpc('admin_set_venue_manager',{ p_handle:h, p_venue:pick.id, on_:true }); if(error) return toast(error.message); toast('@'+h.replace(/^@/,'')+' now manages '+vn); drawVM(); };
+}
 function renderPhotos(){ const p=S.profile;
   subPage('Photos',`
     <div class="row between"><h2 style="margin:0">My photos ${tip('Up to 4. MIRL checks each one first. They show only inside a chat after you both say hi, unless you use one as your avatar. Must be you. No nudity.')}</h2></div>
