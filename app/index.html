@@ -475,6 +475,24 @@ async function movePhoto(id, toPriv){ const { data, error } = await SB.rpc('move
   toast(toPriv?'Moved to your private folder':'Moved to public. MIRL will check it first.'); drawMyPhotos(); drawMyAlbum(); markReview(); }
 // no save / copy / share menus on photos
 ['contextmenu','dragstart','selectstart'].forEach(t=>document.addEventListener(t,e=>{ if(e.target.closest&&e.target.closest('img,[data-view],[data-u],.avatar,.pv')) e.preventDefault(); }));
+// Profile page: pick an approved photo (or the cartoon) as your avatar, right under the avatar
+async function drawProfileAv(){
+  const box=document.getElementById('pav'); if(!box) return;
+  const { data:rows } = await SB.from('photos').select('path,status,private').eq('status','approved').order('created_at');
+  const list=(rows||[]).filter(r=>!r.private); const urls=await signedUrls(list.map(r=>r.path)); if(!document.body.contains(box)) return;
+  const cur=S.profile.avatar_photo;
+  if(cur&&urls[cur]){ S.myAvatarUrl=urls[cur]; const avp=document.getElementById('avp'); if(avp) avp.innerHTML=photoAv(urls[cur],64); }
+  const ring=on=>on?'outline:3px solid var(--gold);outline-offset:2px;':'';
+  box.innerHTML = list.map(r=>`<button data-pa="${esc(r.path)}" aria-label="Use this photo as my avatar" style="all:unset;cursor:pointer;width:56px;height:56px;border-radius:50%;overflow:hidden;${ring(cur===r.path)}">${urls[r.path]?`<img src="${esc(urls[r.path])}" alt="" style="width:100%;height:100%;object-fit:cover">`:''}</button>`).join('')
+    + (list.length?`<button class="back" data-pa="" style="${ring(!cur)}border-radius:28px;padding:0 12px;min-height:56px">${av(S.profile.avatar_icon,S.profile.avatar_color,40)} Cartoon</button>`:'')
+    + `<button class="back" id="pavadd" style="min-height:56px">${list.length?'+ More photos':'+ Add a photo'}</button>`;
+  if(!list.length) box.insertAdjacentHTML('afterend','<p class="small muted" style="margin-top:6px">Photos show here once MIRL approves them.</p>');
+  box.querySelectorAll('[data-pa]').forEach(b=>b.onclick=async()=>{ const path=b.dataset.pa||null; if(path===(cur||null)) return;
+    const { error } = await SB.from('profiles').update({ avatar_photo:path }).eq('id',S.user.id); if(error) return toast(error.message);
+    S.profile.avatar_photo=path; if(!path){ S.myAvatarUrl=null; const avp=document.getElementById('avp'); if(avp) avp.innerHTML=av(S.profile.avatar_icon,S.profile.avatar_color,64); }
+    toast(path?'Your photo is now your avatar':'Back to your cartoon avatar'); drawProfileAv(); });
+  document.getElementById('pavadd').onclick=renderPhotos;
+}
 async function drawMyPhotos(){
   const box=document.getElementById('ph'); if(!box) return;
   const { data:rows } = await SB.from('photos').select('id,path,status,private').order('created_at'); const list=(rows||[]).filter(r=>!r.private);
@@ -1635,6 +1653,7 @@ function renderProfile(needHandle){
     <h1>Profile</h1>
     ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">Pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
     ${idBlock(p.handle||'',ist.icon,ist.color)}
+    ${needHandle?'':'<div id="pavw"><p style="font-weight:600;margin-bottom:8px">Or use one of my photos</p><div class="row" id="pav" style="gap:10px;flex-wrap:wrap"></div></div>'}
     <p class="small muted">First name: <b style="color:var(--ink)">${esc(p.first_name)}</b> ${tip('Your first name only shows after you and someone both say hi.')}</p>
     <h2>About me</h2>
     <label class="f">Bio<textarea id="bio" maxlength="300" rows="3" placeholder="Delray local, always up for live music and tacos.">${esc(p.bio||'')}</textarea></label>
@@ -1661,6 +1680,7 @@ function renderProfile(needHandle){
   document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.v; document.querySelectorAll('#mode button').forEach(x=>x.setAttribute('aria-pressed',x===b)); });
   document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); picked[b.textContent]=on; document.getElementById('cnt').textContent='· '+Object.values(picked).filter(Boolean).length; });
   wireId(ist);
+  if(!needHandle) drawProfileAv();
   const links=(Array.isArray(p.links)?p.links:[]).map(l=>({...l}));
   const drawLinks=()=>{ const b=document.getElementById('lnk'); b.innerHTML=links.map((l,i)=>`<div class="row" style="gap:6px"><input type="text" data-l="${i}" maxlength="30" placeholder="Label" value="${esc(l.label||'')}" style="width:34%"><input type="text" data-u="${i}" maxlength="300" placeholder="https://…" autocapitalize="none" value="${esc(l.url||'')}" style="flex:1"><button class="back" data-rm="${i}" aria-label="Remove link" style="min-width:32px">✕</button></div>`).join('');
     b.querySelectorAll('[data-l]').forEach(x=>x.oninput=()=>links[+x.dataset.l].label=x.value); b.querySelectorAll('[data-u]').forEach(x=>x.oninput=()=>links[+x.dataset.u].url=x.value);
