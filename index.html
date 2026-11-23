@@ -89,6 +89,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
       <div class="eyebrow">Coming to Atlantic Ave in 2027</div>
       <h1>Meet in real life.</h1>
       <p class="lede">Find out where people who like what you like are going tonight, or start your own plan and see who joins.</p>
+      <p class="lede" style="font-size:15px;margin-top:-6px">MIRL never shows you to strangers, just how busy each spot is.</p>
       <div class="how">
         <div><b>1</b><p>Tell us what you're into<small>A 30-second tap quiz. Dating, friends, or open to both.</small></p></div>
         <div><b>2</b><p>See where people are going<small>Every spot on the Avenue is already on the map. Join a plan or post your own, open or invite-only. Go solo or bring up to 4 friends.</small></p></div>
@@ -123,7 +124,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   <div class="wrap">
     <h3>Private by design</h3>
     <div class="three">
-      <div><h4>Counts, not names</h4><p>From outside, you only see how many members are at a venue, and only once there are 5 or more.</p></div>
+      <div><h4>Counts, not names</h4><p>From outside, you only see how many members are at a venue. Never names, never faces.</p></div>
       <div><h4>Inside means inside</h4><p>Profiles show only to members checked in at the same venue. Leave and you drop off.</p></div>
       <div><h4>Real people, request-only</h4><p>Verified photos, 18+, and every hello is a request you can ignore, block or report.</p></div>
     </div>
@@ -163,6 +164,9 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
     d.append('emailAddress',em); d.append('entry.727612882',mode); d.append('entry.498463342',fn);
     d.append('entry.1818047065',zip); d.append('entry.1672117047',"I'm 18 or older");
     var btn=document.getElementById('go'); btn.disabled=true; btn.textContent='Saving...';
+    // also save straight into MIRL's own database (shows in the app's Admin stats)
+    fetch('https://mvgqkliypebyiwqssxbu.supabase.co/rest/v1/rpc/join_waitlist',{method:'POST',headers:{'Content-Type':'application/json','apikey':'sb_publishable_0818FosZ3hllftazzKvlyQ_s9t-qruJ'},
+      body:JSON.stringify({p_email:em,p_first:fn,p_zip:zip,p_mode:mode})}).catch(function(){});
     fetch(URL,{method:'POST',mode:'no-cors',body:d}).then(function(){
       var safe=fn.replace(/[<>&"]/g,'');
       f.innerHTML='<div class="done"><span class="badge" style="justify-content:center"><i></i>Founding Member</span><strong>You\'re on the list, '+safe+'.</strong><p>We\'ll email you when MIRL opens on Atlantic Ave.</p><p style="margin-top:6px">Want the first look? Follow along: <a href="https://www.instagram.com/mirl.app/" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Instagram @mirl.app</a> · <a href="https://www.facebook.com/profile.php?id=61596968152556" target="_blank" rel="noopener" style="color:inherit;font-weight:700">Facebook</a></p></div>';
