@@ -738,7 +738,7 @@ function render(){
   if(!S.profile) return renderOnboard();
   if(!S.profile.handle){ S.tab='me'; return renderMe(true); }
   ({map:renderMap, discover:renderDiscover, plans:renderPlans, chats:renderChats, me:renderMe})[S.tab]();
-  refreshBadges();
+  refreshBadges(); if(pendingJoin()) setTimeout(handleJoin,0);
 }
 // ---------- tab badges: unread chats + friend requests, plans in the next 24h ----------
 let bdgT;
@@ -766,7 +766,10 @@ function renderWelcome(){
   </div>`;
   const go = provider => SB.auth.signInWithOAuth({ provider, options:{ redirectTo: location.origin + location.pathname } });
   document.getElementById('g').onclick = ()=>go('google');
-}
+  const j=pendingJoin(); if(j) SB.rpc('plan_preview',{ code:j.code }).then(({data})=>{ const pl=(data||[])[0]; if(!pl||!document.getElementById('g')) return;
+    const d=new Date(pl.starts_at).toLocaleString('en-US',{ weekday:'long', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+    document.querySelector('.hero h1').insertAdjacentHTML('beforebegin', `<div class="card" style="border-color:var(--gold)"><p class="small muted">🎟️ You're invited</p><p style="font-weight:700;font-size:20px;margin:4px 0">@${esc(j.by||pl.host)} invited you to ${esc(pl.title)}</p><p class="small">📍 ${esc(pl.venue)} · ${esc(d)} · ${pl.going} going</p></div>`);
+    const g=document.getElementById('g'); g.textContent="I'm in. Join MIRL to RSVP"; g.insertAdjacentHTML('afterend','<p class="small muted" style="text-align:center;margin-top:-6px">Free. 18+. Your name stays private until you choose to share it.</p>'); }); }
 
 // ---------- onboarding ----------
 function renderOnboard(){
@@ -983,8 +986,8 @@ async function openVenue(id){
       const d=dist(pos.coords.latitude,pos.coords.longitude,v.lat,v.lng);
       const acc=pos.coords.accuracy||0, allowed=Math.min(250, CHECKIN_RADIUS_M + Math.min(acc,150));
       if(d > allowed) return err.textContent = acc>150
-        ? `Your GPS is weak in here (about ${Math.round(acc)} m off). Step outside or near the door for a few seconds and tap check in again.`
-        : `You look about ${Math.round(d)} m away. Check in once you're there.`;
+        ? `Your GPS is weak in here (about ${Math.round(acc*3.28)} feet off). Step outside or near the door for a few seconds and tap check in again.`
+        : `You look about ${d>=800?(d/1609).toFixed(d>=16090?0:1)+' miles':Math.round(d*3.28)+' feet'} away. Check-in only works once you're at the spot.`;
       const { error } = await SB.rpc('check_in',{ venue: vid, p_lat:pos.coords.latitude, p_lng:pos.coords.longitude, p_acc:acc });
       if(error) return err.textContent = /too_far/.test(error.message) ? 'You look a little too far away. Step inside or near the door and tap check in again.' : 'Could not check in: '+error.message;
       err.textContent=''; toast('Checked in'); openInside(vid, v.name, v.lat, v.lng);
@@ -1097,7 +1100,8 @@ async function openPlan(pid){
     <div class="card row between"><b id="gl">${label()}</b><div class="row"><button class="btn sm" id="mi" aria-label="One fewer friend">−</button><button class="btn sm violet" id="pl" aria-label="One more friend">+</button></div></div>
     <p class="small muted">Bring up to 4 friends.</p>
     <button class="btn ${mine?'violet':'gold'}" id="go">${mine?"You're going ✓ · update":"I'm going"}</button>
-    ${mine?'<div class="row" style="gap:8px"><button class="btn violet" id="pc">💬 Plan chat</button><button class="btn" id="pi">+ Invite friends</button></div><button class="btn" id="lv">Not going anymore</button>':''}
+    ${mine?`<button class="btn gold" id="psh">📲 Invite anyone</button><p class="small muted" style="margin-top:-8px">${(cnt||0)<3?"Plans with 3+ people get way more yes's. Invite a few friends?":"Send this plan by text, Instagram, anywhere. They can join even if they're not on MIRL yet."}</p>
+    <div class="row" style="gap:8px"><button class="btn violet" id="pc">💬 Plan chat</button><button class="btn" id="pi">+ Invite friends</button></div><button class="btn" id="lv">Not going anymore</button>`:''}
     ${p.host_id===S.user.id && p.visibility==='invite'?`<button class="btn" id="cp">Copy invite link</button>`:''}
     ${p.host_id===S.user.id?`<button class="btn" id="cxl" style="color:var(--red);border-color:var(--red)">Cancel this plan</button>`:''}
     <h2>Who's going</h2>
@@ -1120,6 +1124,7 @@ async function openPlan(pid){
   document.getElementById('pl').onclick=()=>{ friends=Math.min(4,friends+1); document.getElementById('gl').textContent=label(); };
   document.getElementById('go').onclick=async()=>{ const { error } = await SB.from('plan_members').upsert({ plan_id:pid, user_id:S.user.id, friends }); if(error) return toast(error.message); toast("You're going"); openPlan(pid); };
   const pc=document.getElementById('pc'); if(pc) pc.onclick=()=>openPlanChat(pid);
+  const psh=document.getElementById('psh'); if(psh) psh.onclick=()=>sharePlan(p);
   const pi=document.getElementById('pi'); if(pi) pi.onclick=async()=>{ const r=await friendPicker('Invite friends', (going||[]).map(g=>g.id), 'Send invites'); if(!r||!r.ids.length) return;
     const { data:n, error } = await SB.rpc('invite_friends',{ pid, uids:r.ids }); if(error) return toast(error.message); toast(n?`Invited ${n} friend${n>1?'s':''}`:'They\'re already going'); };
   const lv=document.getElementById('lv'); if(lv) lv.onclick=async()=>{ await SB.from('plan_members').delete().eq('plan_id',pid).eq('user_id',S.user.id); toast('Removed'); openPlan(pid); };
@@ -1442,7 +1447,7 @@ function renderMe(needHandle){
     ${needHandle?'<div class="card" style="border-color:var(--gold)"><p style="font-weight:600">New: pick a handle and avatar</p><p class="small muted">This is how you show up inside a spot. Then tap Save.</p></div>':''}
     ${idBlock(p.handle||'',ist.icon,ist.color)}
     <p class="small muted">First name (shown after a mutual hi): <b style="color:var(--ink)">${esc(p.first_name)}</b>${p.founding_member?' · <b style="color:var(--violet)">★ Founding Member</b>':''}</p>
-    <button class="btn" id="myfr">👫 My friends</button>
+    <button class="btn" id="myfr">👫 My friends</button><p class="small muted" id="refc" style="margin-top:-8px"></p>
     <h2>About me</h2>
     <label class="f">Bio <span class="small muted">· people you chat with see this</span><textarea id="bio" maxlength="300" rows="3" placeholder="Delray local, always up for live music and tacos.">${esc(p.bio||'')}</textarea></label>
     <p style="font-weight:600;margin:6px 0">My links <span class="small muted" style="font-weight:400">· Facebook, LinkedIn, your business, anything</span></p>
@@ -1498,6 +1503,7 @@ function renderMe(needHandle){
   document.getElementById('pvgo')?.addEventListener('click',()=>needVerify('use a private folder'));
   drawMyPhotos(); drawMyAlbum(); drawBlocks(); drawReview(); drawNotify(); drawVerify(); drawDiscreet();
   document.getElementById('myfr').onclick=renderFriends;
+  SB.rpc('my_referrals').then(({data})=>{ const r=document.getElementById('refc'); if(r&&data) r.textContent=`🎟️ You've brought ${data} ${data===1?'person':'people'} to MIRL with your invites.`; });
   const links=(Array.isArray(p.links)?p.links:[]).map(l=>({...l}));
   const drawLinks=()=>{ const b=document.getElementById('lnk'); b.innerHTML=links.map((l,i)=>`<div class="row" style="gap:6px"><input type="text" data-l="${i}" maxlength="30" placeholder="Label" value="${esc(l.label||'')}" style="width:34%"><input type="text" data-u="${i}" maxlength="300" placeholder="https://…" autocapitalize="none" value="${esc(l.url||'')}" style="flex:1"><button class="back small" data-rm="${i}" aria-label="Remove link">✕</button></div>`).join('');
     b.querySelectorAll('[data-l]').forEach(x=>x.oninput=()=>links[+x.dataset.l].label=x.value); b.querySelectorAll('[data-u]').forEach(x=>x.oninput=()=>links[+x.dataset.u].url=x.value);
@@ -1529,13 +1535,20 @@ function renderMe(needHandle){
 }
 
 // ---------- invite links ----------
+// shared plan links: /app/#join=<code>&by=<handle> works for members and for people not on MIRL yet
+function pendingJoin(){ try{ return JSON.parse(lsGet('mirl_join')||'null'); }catch{ return null; } }
 async function handleJoin(){
-  const m=location.hash.match(/join=([a-f0-9]+)/); if(!m||!S.user||!S.profile) return;
-  history.replaceState(null,'',location.pathname);
-  const { data, error } = await SB.rpc('join_plan_by_code',{ code:m[1], bring:0 });
-  if(error) return toast('That invite link is not valid');
-  toast("You're in"); openPlan(data);
+  const j=pendingJoin(); if(!j||!S.user||!S.profile||!S.profile.handle) return;
+  lsSet('mirl_join',null);
+  const { data:pid, error } = await SB.rpc('accept_plan_link',{ code:j.code, by_handle:j.by||'' });
+  if(error) return toast(/expired/.test(error.message)?'That plan already happened':'That invite link is not valid');
+  toast(j.by&&j.by!==S.profile.handle?`You're going! 🎉 We told @${j.by}. Your plan chat is open, so say hi before you get there.`:"You're going! 🎉"); refreshBadges(); openPlan(pid);
 }
+function sharePlan(p){ const link=`${location.origin}/app/#join=${p.invite_code}&by=${encodeURIComponent(S.profile.handle||'')}`;
+  const w=when(p.starts_at), text=`Come with me! 🎉 ${p.title} at ${p.venues?.name||'the spot'}, ${w.day[0]+w.day.slice(1).toLowerCase()} ${w.time}. RSVP here: ${link}`;
+  if(navigator.share) return navigator.share({ title:p.title, text }).catch(()=>{});
+  navigator.clipboard.writeText(text).then(()=>toast('Invite copied. Paste it in a text or DM.')).catch(()=>prompt('Copy your invite', text)); }
+{ const m=location.hash.match(/join=([a-f0-9]+)(?:&by=([A-Za-z0-9_.%]+))?/); if(m){ lsSet('mirl_join', JSON.stringify({ code:m[1], by:decodeURIComponent(m[2]||'').toLowerCase() })); history.replaceState(null,'',location.pathname+location.search); } }
 showLock();
 boot().then(handleJoin);
 </script>
