@@ -662,7 +662,8 @@ async function drawVerifyQueue(){
 async function drawVerify(){
   const box=document.getElementById('vfy'); if(!box) return;
   const { data:st } = await SB.rpc('my_verification'); if(!document.body.contains(box)) return;
-  if(st==='verified'){ box.innerHTML='<p style="font-weight:600;color:var(--green)">✓ You\'re verified</p><p class="small muted">People see a ✓ next to your handle.</p>'; return; }
+  if(st==='verified'){ box.innerHTML='<p style="font-weight:600;color:var(--green)">✓ You\'re verified</p><p class="small muted">People see a ✓ next to your handle.</p>';
+    if(!S.profile.verified){ S.profile.verified=true; document.getElementById('pvnote')?.remove(); if(document.getElementById('pph')) drawMyAlbum(); } return; }
   if(st==='pending'){ box.innerHTML='<p style="font-weight:600">Under review</p><p class="small muted">MIRL is comparing your selfie with your photos. We\'ll let you know.</p>'; return; }
   const { data:ok } = await SB.from('photos').select('id').eq('status','approved'); if(!document.body.contains(box)) return;
   if(!(ok||[]).length){ box.innerHTML='<p style="font-weight:600">Get a ✓ next to your handle</p><p class="small muted">Add a photo above and get it approved first, so we have something to compare your selfie with.</p>'; return; }
@@ -1521,6 +1522,7 @@ function renderMe(needHandle){
   document.getElementById('m_ac').onclick=renderAccount;
   if(admin){ document.getElementById('m_ad').onclick=renderAdminHub;
     Promise.all([SB.rpc('pending_photos'), SB.rpc('pending_verifications')]).then(([a,b])=>{ const n=(a.data||[]).length+(b.data||[]).length, e=document.getElementById('adn'); if(e&&n){ e.textContent=n; e.hidden=false; } }); }
+  if(!p.verified) SB.rpc('my_verification').then(({data})=>{ if(data==='verified'&&!S.profile.verified){ S.profile.verified=true; if(S.tab==='me'&&document.getElementById('m_ph')) renderMe(); } });
   SB.rpc('my_referrals').then(({data})=>{ const r=document.getElementById('refc'); if(r&&data){ r.textContent=`🎟️ You've brought ${data} ${data===1?'person':'people'} to MIRL`; r.hidden=false; } });
 }
 function renderAdminHub(){ subPage('Admin',`<button class="btn violet" id="admbtn">👑 Members & stats</button><div id="adm"></div><div id="admv"></div>`);
@@ -1532,7 +1534,7 @@ function renderPhotos(){ const p=S.profile;
     <h2>Get your ✓ ${tip('A quick selfie doing a pose proves it\'s really you. You need it for the private folder and Meet invites.')}</h2>
     <div class="card" id="vfy"></div><input type="file" id="vff" accept="image/*" capture="user" hidden>
     <h2>🔒 Private folder ${tip('Up to 12 photos plus a hidden bio. Spicy is OK. MIRL only checks it\'s legal: it\'s you (or you have their OK) and everyone is an adult. Only friends you pick can see it, and you can take it back any time.')}</h2>
-    ${p.verified?'':'<div class="card row between" style="border-color:var(--gold);gap:10px"><p class="small">Get your ✓ first to unlock it.</p><button class="btn sm gold" id="pvgo" style="width:auto;flex-shrink:0">Verify</button></div>'}
+    ${p.verified?'':'<div class="card row between" id="pvnote" style="border-color:var(--gold);gap:10px"><p class="small">Get your ✓ first to unlock it.</p><button class="btn sm gold" id="pvgo" style="width:auto;flex-shrink:0">Verify</button></div>'}
     <div id="pph" class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-start"></div><input type="file" id="pphf" accept="image/*" hidden>
     <label class="f">Hidden bio<textarea id="pbio" maxlength="500" rows="3" placeholder="Only friends you share with see this.">${esc(p.private_bio||'')}</textarea></label>
     <button class="btn sm" id="pbsv" style="align-self:flex-start">Save hidden bio</button>
